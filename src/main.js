@@ -54,6 +54,48 @@ const seedData = {
   log: []
 };
 
+function createIncidentData(settings = {}) {
+  const mergedSettings = {
+    ...seedData.settings,
+    ...settings,
+    incidentName: settings.incidentName || "New Incident",
+    nextMessageNumber: Math.max(1, Number(settings.nextMessageNumber) || 1)
+  };
+  return {
+    settings: mergedSettings,
+    markers: [],
+    checkins: [],
+    frequencies: [
+      {
+        id: crypto.randomUUID(),
+        name: "Primary Net",
+        frequency: mergedSettings.primaryFrequency,
+        mode: "FM Simplex",
+        purpose: "Voice coordination",
+        status: "Active"
+      }
+    ],
+    messages: [],
+    tasks: [],
+    readiness: [],
+    log: [{ time: new Date().toISOString(), text: `Incident workspace opened: ${mergedSettings.incidentName}` }]
+  };
+}
+
+function cloneDemoData() {
+  return {
+    ...seedData,
+    settings: { ...seedData.settings, nextMessageNumber: 4 },
+    markers: seedData.markers.map((item) => ({ ...item, id: crypto.randomUUID() })),
+    checkins: seedData.checkins.map((item) => ({ ...item, id: crypto.randomUUID() })),
+    frequencies: seedData.frequencies.map((item) => ({ ...item, id: crypto.randomUUID() })),
+    messages: seedData.messages.map((item) => ({ ...item, id: crypto.randomUUID(), timeFiled: new Date().toISOString() })),
+    tasks: seedData.tasks.map((item) => ({ ...item, id: crypto.randomUUID() })),
+    readiness: seedData.readiness.map((item) => ({ ...item, id: crypto.randomUUID() })),
+    log: [{ time: new Date().toISOString(), text: "Demo data loaded for training." }]
+  };
+}
+
 let data = loadData();
 let map;
 let layerGroups = {};
@@ -64,11 +106,18 @@ let pendingRelocateStationId = null;
 function loadData() {
   const saved = localStorage.getItem(storageKey);
   if (!saved) {
-    const seeded = { ...seedData, log: [{ time: new Date().toISOString(), text: "Dashboard initialized with sample EmComm data." }] };
-    localStorage.setItem(storageKey, JSON.stringify(seeded));
-    return seeded;
+    const incident = createIncidentData();
+    localStorage.setItem(storageKey, JSON.stringify(incident));
+    return incident;
   }
-  return migrateData(JSON.parse(saved));
+  try {
+    return migrateData(JSON.parse(saved));
+  } catch (error) {
+    const incident = createIncidentData({ notes: "Previous local data could not be read. Import a backup JSON if available." });
+    incident.log.unshift({ time: new Date().toISOString(), text: `Local data recovery started: ${error.message}` });
+    localStorage.setItem(storageKey, JSON.stringify(incident));
+    return incident;
+  }
 }
 
 function migrateData(saved) {
@@ -109,6 +158,127 @@ function saveData(action) {
   }
   localStorage.setItem(storageKey, JSON.stringify(data));
   render();
+}
+
+function downloadText(filename, text, type = "text/plain") {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvEscape(value) {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
+function toCsv(headers, rows) {
+  return [
+    headers.map(csvEscape).join(","),
+    ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(","))
+  ].join("\n");
+}
+
+function exportCsvPackage() {
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+  const sections = [
+    `# ${data.settings.incidentName} EmComm Dashboard CSV Export`,
+    `# Exported ${formatUtcTime(new Date().toISOString())}`,
+    "",
+    "[messages]",
+    toCsv(["number", "utc", "local", "precedence", "handling", "frequency", "from", "to", "subject", "status", "method", "operator", "text"], data.messages.map((item) => ({
+      number: item.number,
+      utc: formatUtcTime(item.timeFiled),
+      local: formatLocalTime(item.timeFiled),
+      precedence: item.priority,
+      handling: item.handling,
+      frequency: item.frequency,
+      from: item.from,
+      to: item.to,
+      subject: item.subject,
+      status: item.status,
+      method: item.method,
+      operator: item.operator,
+      text: item.text
+    }))),
+    "",
+    "[stations]",
+    toCsv(["callsign", "role", "status", "lastHeard"], data.checkins),
+    "",
+    "[frequencies]",
+    toCsv(["name", "frequency", "mode", "purpose", "status"], data.frequencies),
+    "",
+    "[tasks]",
+    toCsv(["title", "assignee", "priority", "status", "location"], data.tasks),
+    "",
+    "[mapMarkers]",
+    toCsv(["type", "name", "lat", "lng", "status", "note"], data.markers),
+    "",
+    "[readiness]",
+    toCsv(["item", "status", "level", "note"], data.readiness),
+    "",
+    "[log]",
+    toCsv(["utc", "local", "event"], data.log.map((item) => ({
+      utc: formatUtcTime(item.time),
+      local: formatLocalTime(item.time),
+      event: item.text
+    })))
+  ];
+  downloadText(`emcomm-dashboard-${stamp}.csv`, sections.join("\n"), "text/csv");
+}
+
+function printOperationalLog() {
+  const rows = data.log.map((item) => `
+    <tr>
+      <td>${escapeHtml(formatUtcTime(item.time))}</td>
+      <td>${escapeHtml(formatLocalTime(item.time))}</td>
+      <td>${escapeHtml(item.text)}</td>
+    </tr>
+  `).join("");
+  const printWindow = window.open("", "emcomm-log-print");
+  if (!printWindow) return;
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>${escapeHtml(data.settings.incidentName)} Operational Log</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #111; }
+          h1 { font-size: 20px; margin-bottom: 4px; }
+          .meta { margin-bottom: 16px; font-size: 12px; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { border: 1px solid #555; padding: 6px; text-align: left; vertical-align: top; }
+          th { background: #eee; }
+        </style>
+      </head>
+      <body>
+        <h1>${escapeHtml(data.settings.incidentName)} Operational Log</h1>
+        <div class="meta">
+          Net: ${escapeHtml(data.settings.netName)} |
+          Control: ${escapeHtml(data.settings.callsign)} |
+          Operator: ${escapeHtml(data.settings.operatorName)} |
+          Exported: ${escapeHtml(formatUtcTime(new Date().toISOString()))}
+        </div>
+        <table>
+          <thead><tr><th>UTC</th><th>Local</th><th>Event</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+function validatedImport(rawData) {
+  const imported = migrateData(rawData);
+  if (!Array.isArray(imported.messages) || !Array.isArray(imported.log)) {
+    throw new Error("Invalid dashboard data file.");
+  }
+  return imported;
 }
 
 function markerColor(type, customColor) {
@@ -182,7 +352,7 @@ function initMap() {
 }
 
 function renderMap() {
-  document.getElementById("mapSummary").innerHTML = data.markers.slice(0, 4).map((item) => `
+  document.getElementById("mapSummary").innerHTML = data.markers.length ? data.markers.slice(0, 4).map((item) => `
     <article>
       <span class="fallback-dot" style="background:${markerColor(item.type, item.color)}"></span>
       <div>
@@ -190,7 +360,7 @@ function renderMap() {
         <span>${escapeHtml(item.type)} · ${escapeHtml(item.status || "")}</span>
       </div>
     </article>
-  `).join("");
+  `).join("") : `<article><div><strong>No markers</strong><span>Add stations, incidents, facilities, or repeaters.</span></div></article>`;
 
   if (!map) {
     document.getElementById("map").innerHTML = `
@@ -363,16 +533,16 @@ function renderSettings() {
 }
 
 function renderCheckins() {
-  document.getElementById("checkinList").innerHTML = data.checkins.map((item) => `
+  document.getElementById("checkinList").innerHTML = data.checkins.length ? data.checkins.map((item) => `
     <li>
       <strong>${escapeHtml(item.callsign)}</strong>
       <span class="meta">${escapeHtml(item.role)} · ${escapeHtml(item.lastHeard)} · <span class="badge ${item.status}">${escapeHtml(item.status)}</span></span>
     </li>
-  `).join("");
+  `).join("") : `<li><strong>No stations checked in</strong><span class="meta">Use Check In when stations join the net.</span></li>`;
 }
 
 function renderFrequencies() {
-  document.getElementById("frequencyList").innerHTML = data.frequencies.map((item) => `
+  document.getElementById("frequencyList").innerHTML = data.frequencies.length ? data.frequencies.map((item) => `
     <article class="frequency-card">
       <div>
         <strong>${escapeHtml(item.frequency)}</strong>
@@ -386,11 +556,11 @@ function renderFrequencies() {
         <button data-delete="frequency" data-id="${item.id}" title="Delete frequency">×</button>
       </div>
     </article>
-  `).join("");
+  `).join("") : `<article class="frequency-card"><strong>No frequencies</strong><span class="muted">Add the active net frequency before logging traffic.</span></article>`;
 }
 
 function renderMessages() {
-  document.getElementById("messageTable").innerHTML = data.messages.map((item) => `
+  document.getElementById("messageTable").innerHTML = data.messages.length ? data.messages.map((item) => `
     <tr class="message-row ${findMarkerForMessage(item) ? "has-map-target" : ""}" data-message-id="${escapeHtml(item.id)}">
       <td>${escapeHtml(item.number)}</td>
       <td>${escapeHtml(formatUtcTime(item.timeFiled))}</td>
@@ -410,7 +580,7 @@ function renderMessages() {
         </div>
       </td>
     </tr>
-  `).join("");
+  `).join("") : `<tr><td colspan="10" class="empty-cell">No formal traffic logged.</td></tr>`;
 }
 
 function renderTasks() {
@@ -419,7 +589,7 @@ function renderTasks() {
     <section class="task-column">
       <h3>${status}</h3>
       <div class="task-list">
-        ${data.tasks.filter((task) => task.status === status).map((task) => `
+        ${data.tasks.filter((task) => task.status === status).length ? data.tasks.filter((task) => task.status === status).map((task) => `
           <article class="task-card">
             <strong>${escapeHtml(task.title)}</strong>
             <span class="badge ${task.priority.toLowerCase()}">${escapeHtml(task.priority)}</span>
@@ -429,14 +599,14 @@ function renderTasks() {
               <button data-delete="task" data-id="${task.id}">Trash</button>
             </div>
           </article>
-        `).join("")}
+        `).join("") : `<article class="task-card empty-card"><span class="meta">No ${escapeHtml(status.toLowerCase())} tasks.</span></article>`}
       </div>
     </section>
   `).join("");
 }
 
 function renderStations() {
-  document.getElementById("stationDirectory").innerHTML = data.checkins.map((item) => `
+  document.getElementById("stationDirectory").innerHTML = data.checkins.length ? data.checkins.map((item) => `
     <article class="station-card">
       <strong>${escapeHtml(item.callsign)}</strong>
       <span class="badge ${item.status}">${escapeHtml(item.status)}</span>
@@ -446,11 +616,11 @@ function renderStations() {
         <button data-delete="station" data-id="${item.id}">Trash</button>
       </div>
     </article>
-  `).join("");
+  `).join("") : `<article class="station-card empty-card"><strong>No station records</strong><span class="meta">Add stations as they check in.</span></article>`;
 }
 
 function renderReadiness() {
-  document.getElementById("readinessGrid").innerHTML = data.readiness.map((item) => `
+  document.getElementById("readinessGrid").innerHTML = data.readiness.length ? data.readiness.map((item) => `
     <article class="readiness-card">
       <strong>${escapeHtml(item.item)}</strong>
       <span class="badge ${item.status.toLowerCase()}">${escapeHtml(item.status)}</span>
@@ -461,16 +631,16 @@ function renderReadiness() {
         <button data-delete="readiness" data-id="${item.id}">Trash</button>
       </div>
     </article>
-  `).join("");
+  `).join("") : `<article class="readiness-card empty-card"><strong>No readiness items</strong><span class="meta">Track power, antennas, forms, gateways, and backups.</span></article>`;
 }
 
 function renderLog() {
-  document.getElementById("eventLog").innerHTML = data.log.map((item) => `
+  document.getElementById("eventLog").innerHTML = data.log.length ? data.log.map((item) => `
     <li>
       <strong>${new Date(item.time).toLocaleString()}</strong>
       <span class="meta">${escapeHtml(item.text)}</span>
     </li>
-  `).join("");
+  `).join("") : `<li><strong>No log entries</strong><span class="meta">Operational events appear here as work is recorded.</span></li>`;
 }
 
 function fieldsToHtml(fields) {
@@ -754,6 +924,18 @@ function bindActions() {
 
   document.getElementById("openSettings").addEventListener("click", () => document.getElementById("editSettings").click());
 
+  document.getElementById("newIncident").addEventListener("click", () => {
+    if (!confirm("Start a new incident workspace on this device? Export the current incident first if you need a record.")) return;
+    data = createIncidentData({ ...data.settings, nextMessageNumber: 1 });
+    saveData("New incident workspace created.");
+  });
+
+  document.getElementById("loadDemo").addEventListener("click", () => {
+    if (!confirm("Load demo training data on this device? Export the current incident first if you need a record.")) return;
+    data = cloneDemoData();
+    saveData("Demo training data loaded.");
+  });
+
   document.getElementById("editSettings").addEventListener("click", () => openEntry("Station Settings", settingsFields(), (entry) => {
     data.settings = {
       ...data.settings,
@@ -789,20 +971,23 @@ function bindActions() {
   });
 
   document.getElementById("exportData").addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `emcomm-dashboard-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadText(`emcomm-dashboard-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), "application/json");
   });
+
+  document.getElementById("exportCsv").addEventListener("click", exportCsvPackage);
+  document.getElementById("printLog").addEventListener("click", printOperationalLog);
 
   document.getElementById("importData").addEventListener("change", async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    data = JSON.parse(await file.text());
-    saveData(`Imported data file: ${file.name}`);
+    try {
+      data = validatedImport(JSON.parse(await file.text()));
+      saveData(`Imported data file: ${file.name}`);
+    } catch (error) {
+      alert(`Import failed: ${error.message}`);
+    } finally {
+      event.target.value = "";
+    }
   });
 
   document.addEventListener("click", (event) => {

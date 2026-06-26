@@ -131,10 +131,15 @@ h2 {
 .icon-button {
   display: inline-grid;
   place-items: center;
-  width: 42px;
+  min-width: 42px;
   padding: 0;
   font-size: 1.2rem;
   font-weight: 800;
+}
+
+#exportCsv {
+  min-width: 58px;
+  font-size: 0.72rem;
 }
 
 .file-button input {
@@ -529,6 +534,11 @@ th {
 
 .message-row.has-map-target:hover td {
   background: rgba(63, 167, 214, 0.08);
+}
+
+.empty-cell,
+.empty-card {
+  color: var(--muted);
 }
 
 .badge {
