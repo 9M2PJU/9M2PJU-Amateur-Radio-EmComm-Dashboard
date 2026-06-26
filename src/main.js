@@ -343,6 +343,21 @@ function fieldsToHtml(fields) {
     if (field.type === "select") {
       return `<label>${field.label}<select name="${field.name}" ${required}>${field.options.map((option) => `<option ${option === value ? "selected" : ""}>${option}</option>`).join("")}</select></label>`;
     }
+    if (field.type === "station-select") {
+      const options = field.options.includes(value) ? field.options : [...field.options, value].filter(Boolean);
+      const selectedValue = options.includes(value) ? value : "Manual / other station";
+      return `
+        <label>${field.label}
+          <select name="${field.name}" data-station-select="${field.manualName}" ${required}>
+            ${options.map((option) => `<option ${option === selectedValue ? "selected" : ""}>${option}</option>`).join("")}
+            <option ${selectedValue === "Manual / other station" ? "selected" : ""}>Manual / other station</option>
+          </select>
+        </label>
+        <label class="manual-station-field">Manual From
+          <input name="${field.manualName}" type="text" value="${escapeAttribute(options.includes(value) ? "" : value)}">
+        </label>
+      `;
+    }
     if (field.type === "textarea") {
       return `<label>${field.label}<textarea name="${field.name}" ${required}>${escapeHtml(value)}</textarea></label>`;
     }
@@ -356,6 +371,7 @@ function openEntry(title, fields, onSave, saveLabel = "Save") {
   const form = document.getElementById("entryForm");
   document.getElementById("dialogTitle").textContent = title;
   document.getElementById("dialogFields").innerHTML = fieldsToHtml(fields);
+  bindStationSelects();
   document.getElementById("saveDialog").textContent = saveLabel;
   document.getElementById("cancelDialog").onclick = () => dialog.close();
   form.onsubmit = (event) => {
@@ -365,6 +381,20 @@ function openEntry(title, fields, onSave, saveLabel = "Save") {
     dialog.close();
   };
   dialog.showModal();
+}
+
+function bindStationSelects() {
+  document.querySelectorAll("[data-station-select]").forEach((select) => {
+    const manual = document.querySelector(`[name="${select.dataset.stationSelect}"]`);
+    const wrapper = manual?.closest("label");
+    const sync = () => {
+      if (!wrapper) return;
+      wrapper.hidden = select.value !== "Manual / other station";
+      if (wrapper.hidden) manual.value = "";
+    };
+    select.addEventListener("change", sync);
+    sync();
+  });
 }
 
 function frequencyFields(item = {}) {
@@ -378,17 +408,27 @@ function frequencyFields(item = {}) {
 }
 
 function messageFields(item = {}) {
+  const stationOptions = stationCallsignOptions();
   return [
     { label: "Message number", name: "number", value: item.number || nextMessageNumber() },
     { label: "Precedence", name: "priority", type: "select", value: item.priority || "Routine", options: ["Routine", "Priority", "Emergency", "Welfare"] },
     { label: "Handling", name: "handling", type: "select", value: item.handling || "Routine", options: ["Routine", "Priority", "Immediate", "Health and welfare"] },
-    { label: "From", name: "from", value: item.from || data.settings.tacticalCall },
+    { label: "From", name: "from", type: "station-select", manualName: "fromManual", value: item.from || data.settings.tacticalCall, options: stationOptions },
     { label: "To", name: "to", value: item.to },
     { label: "Subject", name: "subject", value: item.subject },
     { label: "Method", name: "method", type: "select", value: item.method || "Voice", options: ["Voice", "Winlink", "Packet", "APRS", "Messenger", "Phone relay"] },
     { label: "Status", name: "status", type: "select", value: item.status || "Drafted", options: ["Drafted", "Sent", "Acknowledged", "Delivered", "Canceled"] },
     { label: "Message text", name: "text", type: "textarea", value: item.text || item.subject || "" }
   ];
+}
+
+function stationCallsignOptions() {
+  return [...new Set([
+    data.settings.callsign,
+    data.settings.tacticalCall,
+    ...data.markers.filter((item) => item.type === "station").map((item) => item.name),
+    ...data.checkins.map((item) => item.callsign)
+  ].map((value) => String(value || "").trim().toUpperCase()).filter(Boolean))].sort();
 }
 
 function settingsFields() {
@@ -442,11 +482,13 @@ function nextMessageNumber() {
 }
 
 function normalizeMessage(entry, existing = {}) {
+  const from = entry.from === "Manual / other station" ? entry.fromManual : entry.from;
+  const cleanFrom = String(from || data.settings.tacticalCall).trim().toUpperCase();
   return {
     ...existing,
     ...entry,
     number: entry.number.trim().toUpperCase(),
-    from: entry.from.trim(),
+    from: cleanFrom,
     to: entry.to.trim(),
     subject: entry.subject.trim(),
     text: entry.text.trim(),
