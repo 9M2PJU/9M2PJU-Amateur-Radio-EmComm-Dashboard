@@ -708,10 +708,6 @@ dialog textarea {
   grid-column: 1 / -1;
 }
 
-.manual-station-field[hidden] {
-  display: none;
-}
-
 dialog menu {
   display: flex;
   justify-content: flex-end;
