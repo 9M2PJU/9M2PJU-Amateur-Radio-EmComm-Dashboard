@@ -23,6 +23,8 @@ const seedData = {
   },
   markers: [
     { id: crypto.randomUUID(), type: "station", name: "9M2PJU Net Control", lat: 3.139, lng: 101.6869, status: "available", note: "Primary control station" },
+    { id: crypto.randomUUID(), type: "station", name: "9W2FIELD Mobile", lat: 3.126, lng: 101.675, status: "assigned", note: "Field team station" },
+    { id: crypto.randomUUID(), type: "station", name: "9M4DIGI Winlink", lat: 3.148, lng: 101.698, status: "available", note: "Digital gateway station" },
     { id: crypto.randomUUID(), type: "repeater", name: "VHF Repeater", lat: 3.152, lng: 101.703, status: "online", note: "145.600 MHz -600 kHz tone 103.5" },
     { id: crypto.randomUUID(), type: "facility", name: "Relief Centre", lat: 3.12, lng: 101.66, status: "open", note: "Shelter and supplies" },
     { id: crypto.randomUUID(), type: "incident", name: "Flood Report", lat: 3.105, lng: 101.72, status: "urgent", note: "Road partially closed" }
@@ -38,9 +40,9 @@ const seedData = {
     { id: crypto.randomUUID(), name: "Digital", frequency: "144.390 MHz", mode: "APRS", purpose: "Position reports", status: "Standby" }
   ],
   messages: [
-    { id: crypto.randomUUID(), number: "MSG-001", priority: "Emergency", from: "Relief Centre", to: "Net Control", subject: "Medical transport needed", status: "Sent", handling: "Immediate", method: "Voice", frequency: "145.500 MHz", text: "Medical transport requested for one patient.", timeFiled: new Date().toISOString() },
-    { id: crypto.randomUUID(), number: "MSG-002", priority: "Priority", from: "Mobile Team", to: "Logistics", subject: "Need drinking water", status: "Acknowledged", handling: "Priority", method: "Voice", frequency: "145.500 MHz", text: "Additional drinking water needed at relief centre.", timeFiled: new Date().toISOString() },
-    { id: crypto.randomUUID(), number: "MSG-003", priority: "Routine", from: "Net Control", to: "All stations", subject: "Operational period update", status: "Delivered", handling: "Routine", method: "Net broadcast", frequency: "145.500 MHz", text: "Operational period update sent to all stations.", timeFiled: new Date().toISOString() }
+    { id: crypto.randomUUID(), number: "MSG-001", priority: "Emergency", from: "9W2FIELD", to: "NET CONTROL", subject: "Medical transport needed", status: "Sent", handling: "Immediate", method: "Voice", frequency: "145.500 MHz", text: "MEDICAL TRANSPORT REQUESTED FOR ONE PATIENT", timeFiled: new Date().toISOString() },
+    { id: crypto.randomUUID(), number: "MSG-002", priority: "Priority", from: "9M2PJU", to: "LOGISTICS", subject: "Need drinking water", status: "Acknowledged", handling: "Priority", method: "Voice", frequency: "145.500 MHz", text: "ADDITIONAL DRINKING WATER NEEDED AT RELIEF CENTRE", timeFiled: new Date().toISOString() },
+    { id: crypto.randomUUID(), number: "MSG-003", priority: "Routine", from: "9M4DIGI", to: "ALL STATIONS", subject: "Operational period update", status: "Delivered", handling: "Routine", method: "Net broadcast", frequency: "145.500 MHz", text: "OPERATIONAL PERIOD UPDATE SENT TO ALL STATIONS", timeFiled: new Date().toISOString() }
   ],
   tasks: [
     { id: crypto.randomUUID(), title: "Confirm repeater backup power", assignee: "9M4DIGI", priority: "Priority", status: "Assigned", location: "Hill site" },
@@ -83,6 +85,28 @@ function createIncidentData(settings = {}) {
   };
 }
 
+function createIaruMessageRecord(item, settings, activeFrequency) {
+  const timeFiled = item.timeFiled || new Date().toISOString();
+  const text = String(item.text || item.subject || "").trim();
+  const from = String(item.from || item.stationOrigin || settings.callsign || "").trim().toUpperCase();
+  return {
+    handling: item.priority || "Routine",
+    method: item.method || "Voice",
+    ...item,
+    frequency: item.frequency || activeFrequency,
+    text,
+    timeFiled,
+    stationOrigin: String(item.stationOrigin || from).trim().toUpperCase(),
+    placeOrigin: String(item.placeOrigin || settings.location || "").trim().toUpperCase(),
+    filingTime: item.filingTime || formatFilingTime(timeFiled),
+    filingDate: item.filingDate || formatFilingDate(timeFiled),
+    wordCount: Math.max(0, Number(item.wordCount) || countMessageWords(text)),
+    from,
+    to: String(item.to || "").trim().toUpperCase(),
+    subject: item.subject || messageSummary(text)
+  };
+}
+
 function cloneDemoData() {
   return {
     ...seedData,
@@ -90,7 +114,11 @@ function cloneDemoData() {
     markers: seedData.markers.map((item) => ({ ...item, id: crypto.randomUUID() })),
     checkins: seedData.checkins.map((item) => ({ ...item, id: crypto.randomUUID() })),
     frequencies: seedData.frequencies.map((item) => ({ ...item, id: crypto.randomUUID() })),
-    messages: seedData.messages.map((item) => ({ ...item, id: crypto.randomUUID(), timeFiled: new Date().toISOString() })),
+    messages: seedData.messages.map((item) => createIaruMessageRecord(
+      { ...item, id: crypto.randomUUID(), timeFiled: new Date().toISOString() },
+      seedData.settings,
+      seedData.settings.primaryFrequency
+    )),
     tasks: seedData.tasks.map((item) => ({ ...item, id: crypto.randomUUID() })),
     readiness: seedData.readiness.map((item) => ({ ...item, id: crypto.randomUUID() })),
     log: [{ time: new Date().toISOString(), text: "Demo data loaded for training." }]
@@ -137,14 +165,11 @@ function migrateData(saved) {
     markers: saved.markers || seedData.markers,
     checkins: saved.checkins || seedData.checkins,
     frequencies,
-    messages: (saved.messages || seedData.messages).map((item) => ({
-      handling: item.priority || "Routine",
-      method: "Voice",
-      frequency: activeFrequency,
-      text: item.subject || "",
-      timeFiled: new Date().toISOString(),
-      ...item
-    })),
+    messages: (saved.messages || seedData.messages).map((item) => createIaruMessageRecord(
+      item,
+      { ...seedData.settings, ...(saved.settings || {}) },
+      activeFrequency
+    )),
     tasks: saved.tasks || seedData.tasks,
     readiness: saved.readiness || seedData.readiness,
     log: saved.log || []
@@ -214,20 +239,22 @@ function exportCsvPackage() {
     `# Exported ${formatUtcTime(new Date().toISOString())}`,
     "",
     "[messages]",
-    toCsv(["number", "utc", "local", "precedence", "handling", "frequency", "from", "to", "subject", "status", "method", "operator", "text"], data.messages.map((item) => ({
+    toCsv(["number", "precedence", "station_of_origin", "word_count_check", "place_of_origin", "filing_time", "filing_date", "frequency", "to", "from", "message", "status", "operator", "utc_created", "local_created"], data.messages.map((item) => ({
       number: item.number,
-      utc: formatUtcTime(item.timeFiled),
-      local: formatLocalTime(item.timeFiled),
       precedence: item.priority,
-      handling: item.handling,
+      station_of_origin: item.stationOrigin,
+      word_count_check: item.wordCount,
+      place_of_origin: item.placeOrigin,
+      filing_time: item.filingTime,
+      filing_date: item.filingDate,
       frequency: item.frequency,
-      from: item.from,
       to: item.to,
-      subject: item.subject,
+      from: item.from,
+      message: item.text,
       status: item.status,
-      method: item.method,
       operator: item.operator,
-      text: item.text
+      utc_created: formatUtcTime(item.timeFiled),
+      local_created: formatLocalTime(item.timeFiled)
     }))),
     "",
     "[stations]",
@@ -631,13 +658,15 @@ function renderMessages() {
   document.getElementById("messageTable").innerHTML = data.messages.length ? data.messages.map((item) => `
     <tr class="message-row ${findMarkerForMessage(item) ? "has-map-target" : ""}" data-message-id="${escapeHtml(item.id)}">
       <td>${escapeHtml(item.number)}</td>
-      <td>${escapeHtml(formatUtcTime(item.timeFiled))}</td>
-      <td>${escapeHtml(formatLocalTime(item.timeFiled))}</td>
+      <td>${escapeHtml(item.filingDate || formatFilingDate(item.timeFiled))}</td>
+      <td>${escapeHtml(item.filingTime || formatFilingTime(item.timeFiled))}</td>
       <td><span class="badge ${item.priority.toLowerCase()}">${escapeHtml(item.priority)}</span></td>
+      <td>${escapeHtml(item.stationOrigin || item.from)}</td>
+      <td>${escapeHtml(item.wordCount || countMessageWords(item.text))}</td>
       <td>${escapeHtml(item.frequency || activeFrequencyLabel())}</td>
-      <td>${escapeHtml(item.from)}</td>
       <td>${escapeHtml(item.to)}</td>
-      <td>${escapeHtml(item.subject)}</td>
+      <td>${escapeHtml(item.from)}</td>
+      <td>${escapeHtml(messageSummary(item.text || item.subject))}</td>
       <td>${escapeHtml(item.status)}</td>
       <td>
         <div class="table-actions">
@@ -734,6 +763,7 @@ function openEntry(title, fields, onSave, saveLabel = "Save") {
   const form = document.getElementById("entryForm");
   document.getElementById("dialogTitle").textContent = title;
   document.getElementById("dialogFields").innerHTML = fieldsToHtml(fields);
+  bindMessageWordCount(form);
   document.getElementById("saveDialog").textContent = saveLabel;
   document.getElementById("cancelDialog").onclick = () => dialog.close();
   form.onsubmit = (event) => {
@@ -743,6 +773,17 @@ function openEntry(title, fields, onSave, saveLabel = "Save") {
     dialog.close();
   };
   dialog.showModal();
+}
+
+function bindMessageWordCount(form) {
+  const text = form.querySelector('[name="text"]');
+  const wordCount = form.querySelector('[name="wordCount"]');
+  if (!text || !wordCount) return;
+  const sync = () => {
+    wordCount.value = countMessageWords(text.value);
+  };
+  text.addEventListener("input", sync);
+  sync();
 }
 
 function frequencyFields(item = {}) {
@@ -786,17 +827,23 @@ function readinessFields(item = {}) {
 function messageFields(item = {}) {
   const stationOptions = stationCallsignOptions();
   const selectedFrom = stationOptions.includes(String(item.from || "").toUpperCase()) ? String(item.from).toUpperCase() : stationOptions[0];
+  const selectedOrigin = stationOptions.includes(String(item.stationOrigin || "").toUpperCase())
+    ? String(item.stationOrigin).toUpperCase()
+    : selectedFrom;
+  const filingSource = item.timeFiled || new Date();
   return [
     { label: "Message number", name: "number", value: item.number || nextMessageNumber() },
     { label: "Precedence", name: "priority", type: "select", value: item.priority || "Routine", options: ["Routine", "Priority", "Emergency", "Welfare"] },
-    { label: "Handling", name: "handling", type: "select", value: item.handling || "Routine", options: ["Routine", "Priority", "Immediate", "Health and welfare"] },
+    { label: "Station of origin", name: "stationOrigin", type: "select", value: selectedOrigin, options: stationOptions },
+    { label: "Word count (check)", name: "wordCount", type: "number", value: item.wordCount || countMessageWords(item.text || item.subject || "") },
+    { label: "Place of origin", name: "placeOrigin", value: item.placeOrigin || data.settings.location },
+    { label: "Filing time", name: "filingTime", type: "time", value: item.filingTime || formatFilingTime(filingSource) },
+    { label: "Filing date", name: "filingDate", type: "date", value: item.filingDate || formatFilingDate(filingSource) },
     { label: "Frequency", name: "frequency", type: "select", value: item.frequency || activeFrequencyLabel(), options: frequencyOptions() },
-    { label: "From", name: "from", type: "select", value: selectedFrom, options: stationOptions },
-    { label: "To", name: "to", value: item.to },
-    { label: "Subject", name: "subject", value: item.subject },
-    { label: "Method", name: "method", type: "select", value: item.method || "Voice", options: ["Voice", "Winlink", "Packet", "APRS", "Messenger", "Phone relay"] },
+    { label: "To (block letters)", name: "to", value: item.to },
+    { label: "Message text", name: "text", type: "textarea", value: item.text || item.subject || "" },
+    { label: "From (block letters)", name: "from", type: "select", value: selectedFrom, options: stationOptions },
     { label: "Status", name: "status", type: "select", value: item.status || "Drafted", options: ["Drafted", "Sent", "Acknowledged", "Delivered", "Canceled"] },
-    { label: "Message text", name: "text", type: "textarea", value: item.text || item.subject || "" }
   ];
 }
 
@@ -891,16 +938,25 @@ function nextMessageNumber() {
 
 function normalizeMessage(entry, existing = {}) {
   const cleanFrom = String(entry.from || stationCallsignOptions()[0] || "").trim().toUpperCase();
+  const text = String(entry.text || "").trim();
+  const filedAt = existing.timeFiled || new Date().toISOString();
+  const filingDate = entry.filingDate || formatFilingDate(filedAt);
+  const filingTime = entry.filingTime || formatFilingTime(filedAt);
   return {
     ...existing,
     ...entry,
     number: entry.number.trim().toUpperCase(),
+    stationOrigin: String(entry.stationOrigin || cleanFrom).trim().toUpperCase(),
+    wordCount: Math.max(0, Number(entry.wordCount) || countMessageWords(text)),
+    placeOrigin: String(entry.placeOrigin || data.settings.location).trim().toUpperCase(),
+    filingTime,
+    filingDate,
     from: cleanFrom,
-    to: entry.to.trim(),
-    subject: entry.subject.trim(),
+    to: entry.to.trim().toUpperCase(),
+    subject: messageSummary(text),
     frequency: String(entry.frequency || activeFrequencyLabel()).trim(),
-    text: entry.text.trim(),
-    timeFiled: existing.timeFiled || new Date().toISOString(),
+    text: text.toUpperCase(),
+    timeFiled: filedAt,
     operator: data.settings.callsign
   };
 }
@@ -1266,6 +1322,29 @@ function formatLocalTime(value) {
     hour: "2-digit",
     minute: "2-digit"
   });
+}
+
+function formatFilingDate(value = new Date()) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function formatFilingTime(value = new Date()) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function countMessageWords(value) {
+  return String(value || "").trim().split(/\s+/).filter(Boolean).length;
+}
+
+function messageSummary(value) {
+  const words = String(value || "").trim().split(/\s+/).filter(Boolean);
+  return words.slice(0, 10).join(" ");
 }
 
 function escapeHtml(value) {
