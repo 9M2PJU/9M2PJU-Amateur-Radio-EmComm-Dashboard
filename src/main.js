@@ -270,6 +270,8 @@ function renderMessages() {
   document.getElementById("messageTable").innerHTML = data.messages.map((item) => `
     <tr>
       <td>${escapeHtml(item.number)}</td>
+      <td>${escapeHtml(formatUtcTime(item.timeFiled))}</td>
+      <td>${escapeHtml(formatLocalTime(item.timeFiled))}</td>
       <td><span class="badge ${item.priority.toLowerCase()}">${escapeHtml(item.priority)}</span></td>
       <td>${escapeHtml(item.from)}</td>
       <td>${escapeHtml(item.to)}</td>
@@ -652,6 +654,24 @@ function tickClock() {
   document.getElementById("clock").textContent = data.settings.timezone === "UTC"
     ? `${now.toISOString().slice(11, 16)}Z`
     : now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatUtcTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return `${date.toISOString().slice(0, 10)} ${date.toISOString().slice(11, 16)}Z`;
+}
+
+function formatLocalTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return date.toLocaleString([], {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function escapeHtml(value) {
