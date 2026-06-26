@@ -102,7 +102,7 @@ let map;
 let layerGroups = {};
 let markerRefs = new Map();
 let installPrompt;
-let pendingRelocateStationId = null;
+let pendingRelocateMarkerId = null;
 
 function loadData() {
   const saved = readLocalData();
@@ -367,13 +367,13 @@ function initMap() {
   });
 
   map.on("contextmenu", (event) => {
-    if (pendingRelocateStationId) return;
+    if (pendingRelocateMarkerId) return;
     openStationMarkerDialog(event.latlng.lat, event.latlng.lng);
   });
 
   map.on("click", (event) => {
-    if (pendingRelocateStationId) {
-      relocateStationMarker(pendingRelocateStationId, event.latlng);
+    if (pendingRelocateMarkerId) {
+      relocateMapMarker(pendingRelocateMarkerId, event.latlng);
       return;
     }
     hideStationContextMenu();
@@ -427,12 +427,10 @@ function renderMap() {
       })
       .addTo(group);
 
-    if (item.type === "station") {
-      marker.on("contextmenu", (event) => {
-        L.DomEvent.stop(event);
-        showStationContextMenu(item, event.latlng);
-      });
-    }
+    marker.on("contextmenu", (event) => {
+      L.DomEvent.stop(event);
+      showMapMarkerContextMenu(item, event.latlng);
+    });
 
     markerRefs.set(item.id, marker);
   });
@@ -472,13 +470,13 @@ function focusMessageStation(messageId) {
     document.querySelector(`.layer-toggle[data-layer="${groupName}"]`)?.classList.add("active");
   }
   hideStationContextMenu();
-  pendingRelocateStationId = null;
+  pendingRelocateMarkerId = null;
   clearRelocateBanner();
   map.flyTo([markerData.lat, markerData.lng], Math.max(map.getZoom(), 15), { duration: 0.5 });
   markerRefs.get(markerData.id)?.openPopup();
 }
 
-function showStationContextMenu(station, latlng) {
+function showMapMarkerContextMenu(marker, latlng) {
   hideStationContextMenu();
   const point = map.latLngToContainerPoint(latlng);
   const menu = document.createElement("div");
@@ -487,10 +485,11 @@ function showStationContextMenu(station, latlng) {
   menu.style.left = `${Math.max(8, point.x)}px`;
   menu.style.top = `${Math.max(8, point.y)}px`;
   menu.innerHTML = `
-    <strong>${escapeHtml(station.name)}</strong>
-    <button data-action="start-relocate-station" data-id="${escapeHtml(station.id)}">Relocate</button>
-    <button data-action="edit-map-station" data-id="${escapeHtml(station.id)}">Edit</button>
-    <button data-delete="map-station" data-id="${escapeHtml(station.id)}">Trash</button>
+    <strong>${escapeHtml(marker.name)}</strong>
+    <span>${escapeHtml(marker.type)} marker</span>
+    <button data-action="start-relocate-marker" data-id="${escapeHtml(marker.id)}">Relocate</button>
+    <button data-action="edit-map-marker" data-id="${escapeHtml(marker.id)}">Edit</button>
+    <button data-delete="map-marker" data-id="${escapeHtml(marker.id)}">Trash</button>
     <button data-action="close-station-menu">Cancel</button>
   `;
   document.querySelector(".map-panel").appendChild(menu);
@@ -500,15 +499,15 @@ function hideStationContextMenu() {
   document.getElementById("stationContextMenu")?.remove();
 }
 
-function setRelocateBanner(station) {
+function setRelocateBanner(marker) {
   clearRelocateBanner();
   const banner = document.createElement("div");
   banner.className = "relocate-banner";
   banner.id = "relocateBanner";
   banner.innerHTML = `
-    <strong>Relocating ${escapeHtml(station.name)}</strong>
+    <strong>Relocating ${escapeHtml(marker.name)}</strong>
     <span>Click the new map position.</span>
-    <button data-action="cancel-relocate-station">Cancel</button>
+    <button data-action="cancel-relocate-marker">Cancel</button>
   `;
   document.querySelector(".map-panel").appendChild(banner);
 }
@@ -517,15 +516,15 @@ function clearRelocateBanner() {
   document.getElementById("relocateBanner")?.remove();
 }
 
-function relocateStationMarker(id, latlng) {
-  const station = data.markers.find((item) => item.id === id && item.type === "station");
-  if (!station) return;
-  station.lat = Number(latlng.lat);
-  station.lng = Number(latlng.lng);
-  station.note = station.note ? `${station.note} | Relocated ${formatUtcTime(new Date().toISOString())}` : `Relocated ${formatUtcTime(new Date().toISOString())}`;
-  pendingRelocateStationId = null;
+function relocateMapMarker(id, latlng) {
+  const marker = data.markers.find((item) => item.id === id);
+  if (!marker) return;
+  marker.lat = Number(latlng.lat);
+  marker.lng = Number(latlng.lng);
+  marker.note = marker.note ? `${marker.note} | Relocated ${formatUtcTime(new Date().toISOString())}` : `Relocated ${formatUtcTime(new Date().toISOString())}`;
+  pendingRelocateMarkerId = null;
   clearRelocateBanner();
-  saveData(`Station relocated: ${station.name}`);
+  saveData(`Map marker relocated: ${marker.name}`);
 }
 
 function render() {
@@ -846,33 +845,44 @@ function settingsFields() {
   ];
 }
 
-function stationMarkerFields(lat, lng) {
+function mapMarkerFields(lat, lng, item = {}) {
+  const type = item.type || "station";
   return [
-    { label: "Callsign or station name", name: "name", value: "" },
-    { label: "Status", name: "status", type: "select", value: "available", options: ["available", "assigned", "mobile", "offline", "needs assistance"] },
-    { label: "Marker color", name: "color", type: "color", value: markerColor("station") },
+    { label: "Type", name: "type", type: "select", value: type, options: ["station", "incident", "facility", "repeater"] },
+    { label: "Name or callsign", name: "name", value: item.name || "" },
+    { label: "Status", name: "status", value: item.status || defaultMarkerStatus(type) },
+    { label: "Marker color", name: "color", type: "color", value: markerColor(type, item.color) },
     { label: "Latitude", name: "lat", type: "number", value: lat.toFixed(6) },
     { label: "Longitude", name: "lng", type: "number", value: lng.toFixed(6) },
-    { label: "Notes", name: "note", type: "textarea", value: "Added by right-click on map" }
+    { label: "Notes", name: "note", type: "textarea", value: item.note || "Added by right-click on map" }
   ];
 }
 
+function defaultMarkerStatus(type) {
+  return {
+    station: "available",
+    incident: "reported",
+    facility: "open",
+    repeater: "online"
+  }[type] || "new";
+}
+
 function openStationMarkerDialog(lat, lng) {
-  openEntry("Add Station on Map", stationMarkerFields(lat, lng), (entry) => {
+  openEntry("Add Marker on Map", mapMarkerFields(lat, lng), (entry) => {
     const marker = {
       id: crypto.randomUUID(),
-      type: "station",
+      type: entry.type,
       name: entry.name.trim().toUpperCase(),
       lat: Number(entry.lat),
       lng: Number(entry.lng),
       status: entry.status,
-      color: sanitizeMarkerColor(entry.color) || markerColor("station"),
+      color: sanitizeMarkerColor(entry.color) || markerColor(entry.type),
       note: entry.note.trim()
     };
     if (!marker.name || !Number.isFinite(marker.lat) || !Number.isFinite(marker.lng)) return;
     data.markers.push(marker);
-    saveData(`Station marker added: ${marker.name}`);
-  }, "Add Station");
+    saveData(`Map marker added: ${marker.name}`);
+  }, "Add Marker");
 }
 
 function nextMessageNumber() {
@@ -1071,12 +1081,12 @@ function bindActions() {
       saveData(`Station trashed: ${item.callsign}`);
       return;
     }
-    if (deleteButton.dataset.delete === "map-station") {
-      const item = data.markers.find((marker) => marker.id === deleteButton.dataset.id && marker.type === "station");
-      if (!item || !confirm(`Trash map station ${item.name}?`)) return;
+    if (deleteButton.dataset.delete === "map-marker") {
+      const item = data.markers.find((marker) => marker.id === deleteButton.dataset.id);
+      if (!item || !confirm(`Trash map marker ${item.name}?`)) return;
       hideStationContextMenu();
       data.markers = data.markers.filter((marker) => marker.id !== item.id);
-      saveData(`Map station trashed: ${item.name}`);
+      saveData(`Map marker trashed: ${item.name}`);
       return;
     }
     if (deleteButton.dataset.delete === "readiness") {
@@ -1108,18 +1118,18 @@ function bindActions() {
 }
 
 function handleAction(action, id) {
-  if (action === "start-relocate-station") {
-    const station = data.markers.find((item) => item.id === id && item.type === "station");
-    if (!station) return;
-    pendingRelocateStationId = id;
+  if (action === "start-relocate-marker") {
+    const marker = data.markers.find((item) => item.id === id);
+    if (!marker) return;
+    pendingRelocateMarkerId = id;
     hideStationContextMenu();
-    setRelocateBanner(station);
+    setRelocateBanner(marker);
     map?.closePopup();
     return;
   }
 
-  if (action === "cancel-relocate-station") {
-    pendingRelocateStationId = null;
+  if (action === "cancel-relocate-marker") {
+    pendingRelocateMarkerId = null;
     clearRelocateBanner();
     return;
   }
@@ -1129,26 +1139,27 @@ function handleAction(action, id) {
     return;
   }
 
-  if (action === "edit-map-station") {
-    const item = data.markers.find((marker) => marker.id === id && marker.type === "station");
+  if (action === "edit-map-marker") {
+    const item = data.markers.find((marker) => marker.id === id);
     if (!item) return;
     hideStationContextMenu();
-    openEntry("Edit Map Station", stationMarkerFields(item.lat, item.lng).map((field) => ({
+    openEntry("Edit Map Marker", mapMarkerFields(item.lat, item.lng, item).map((field) => ({
       ...field,
       value: item[field.name] ?? field.value
     })), (entry) => {
       const marker = {
+        type: entry.type,
         name: entry.name.trim().toUpperCase(),
         status: entry.status,
         lat: Number(entry.lat),
         lng: Number(entry.lng),
-        color: sanitizeMarkerColor(entry.color) || markerColor("station"),
+        color: sanitizeMarkerColor(entry.color) || markerColor(entry.type),
         note: entry.note.trim()
       };
       if (!marker.name || !Number.isFinite(marker.lat) || !Number.isFinite(marker.lng)) return;
       Object.assign(item, marker);
-      saveData(`Map station updated: ${marker.name}`);
-    }, "Save Station");
+      saveData(`Map marker updated: ${marker.name}`);
+    }, "Save Marker");
     return;
   }
 
