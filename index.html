@@ -16,14 +16,26 @@
           <p class="eyebrow">Amateur Radio Emergency Communications</p>
           <h1 id="appTitle">9M2PJU EmComm Dashboard</h1>
         </div>
-        <div class="topbar-actions">
-          <button class="icon-button" id="openSettings" title="Settings" aria-label="Settings">⚙</button>
-          <button class="icon-button" id="installApp" title="Install app" aria-label="Install app">+</button>
-          <button class="icon-button" id="exportData" title="Export data" aria-label="Export data">⇩</button>
-          <label class="icon-button file-button" title="Import data" aria-label="Import data">
-            ⇧
-            <input id="importData" type="file" accept="application/json">
-          </label>
+        <div class="topbar-tools">
+          <div class="time-widget" aria-label="Local and UTC time">
+            <div>
+              <span>UTC</span>
+              <strong id="utcClock">--:--Z</strong>
+            </div>
+            <div>
+              <span>Local</span>
+              <strong id="localClock">--:--</strong>
+            </div>
+          </div>
+          <div class="topbar-actions">
+            <button class="icon-button" id="openSettings" title="Settings" aria-label="Settings">⚙</button>
+            <button class="icon-button" id="installApp" title="Install app" aria-label="Install app">+</button>
+            <button class="icon-button" id="exportData" title="Export data" aria-label="Export data">⇩</button>
+            <label class="icon-button file-button" title="Import data" aria-label="Import data">
+              ⇧
+              <input id="importData" type="file" accept="application/json">
+            </label>
+          </div>
         </div>
       </header>
 

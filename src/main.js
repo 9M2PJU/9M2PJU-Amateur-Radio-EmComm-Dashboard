@@ -615,6 +615,8 @@ function handleAction(action, id) {
 
 function tickClock() {
   const now = new Date();
+  document.getElementById("utcClock").textContent = `${now.toISOString().slice(11, 16)}Z`;
+  document.getElementById("localClock").textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   document.getElementById("clock").textContent = data.settings.timezone === "UTC"
     ? `${now.toISOString().slice(11, 16)}Z`
     : now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });

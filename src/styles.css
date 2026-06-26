@@ -86,9 +86,46 @@ h2 {
   margin-bottom: 0;
 }
 
+.topbar-tools,
 .topbar-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.topbar-tools {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.time-widget {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(86px, 1fr));
+  gap: 8px;
+}
+
+.time-widget div {
+  min-height: 42px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #132028;
+}
+
+.time-widget span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.time-widget strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--yellow);
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
 .icon-button {
@@ -614,6 +651,11 @@ dialog menu {
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .topbar-tools {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .dashboard {
