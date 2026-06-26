@@ -514,6 +514,14 @@ th {
   font-weight: 600;
 }
 
+.message-row.has-map-target {
+  cursor: pointer;
+}
+
+.message-row.has-map-target:hover td {
+  background: rgba(63, 167, 214, 0.08);
+}
+
 .badge {
   display: inline-flex;
   align-items: center;

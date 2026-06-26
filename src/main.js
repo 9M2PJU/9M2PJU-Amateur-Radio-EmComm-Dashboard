@@ -57,6 +57,7 @@ const seedData = {
 let data = loadData();
 let map;
 let layerGroups = {};
+let markerRefs = new Map();
 let installPrompt;
 let pendingRelocateStationId = null;
 
@@ -200,6 +201,7 @@ function renderMap() {
   }
 
   Object.values(layerGroups).forEach((group) => group.clearLayers());
+  markerRefs = new Map();
   data.markers.forEach((item) => {
     const groupName = `${item.type}s`;
     const group = layerGroups[groupName] || layerGroups.incidents;
@@ -213,7 +215,49 @@ function renderMap() {
         showStationContextMenu(item, event.latlng);
       });
     }
+
+    markerRefs.set(item.id, marker);
   });
+}
+
+function normalizeStationKey(value) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, " ")
+    .trim();
+}
+
+function findMarkerForMessage(message) {
+  if (!message) return null;
+  const fromKey = normalizeStationKey(message.from);
+  if (!fromKey) return null;
+  const stationMarkers = data.markers.filter((item) => item.type === "station");
+  return findMarkerByName(stationMarkers, fromKey) || findMarkerByName(data.markers, fromKey);
+}
+
+function findMarkerByName(markers, fromKey) {
+  return markers.find((item) => {
+    const nameKey = normalizeStationKey(item.name);
+    const firstToken = nameKey.split(" ")[0];
+    return nameKey === fromKey || firstToken === fromKey || nameKey.includes(fromKey) || fromKey.includes(nameKey);
+  });
+}
+
+function focusMessageStation(messageId) {
+  const message = data.messages.find((item) => item.id === messageId);
+  const markerData = findMarkerForMessage(message);
+  if (!markerData || !map) return;
+  const groupName = `${markerData.type}s`;
+  const group = layerGroups[groupName] || layerGroups.incidents;
+  if (!map.hasLayer(group)) {
+    group.addTo(map);
+    document.querySelector(`.layer-toggle[data-layer="${groupName}"]`)?.classList.add("active");
+  }
+  hideStationContextMenu();
+  pendingRelocateStationId = null;
+  clearRelocateBanner();
+  map.flyTo([markerData.lat, markerData.lng], Math.max(map.getZoom(), 15), { duration: 0.5 });
+  markerRefs.get(markerData.id)?.openPopup();
 }
 
 function showStationContextMenu(station, latlng) {
@@ -335,7 +379,7 @@ function renderFrequencies() {
 
 function renderMessages() {
   document.getElementById("messageTable").innerHTML = data.messages.map((item) => `
-    <tr>
+    <tr class="message-row ${findMarkerForMessage(item) ? "has-map-target" : ""}" data-message-id="${escapeHtml(item.id)}">
       <td>${escapeHtml(item.number)}</td>
       <td>${escapeHtml(formatUtcTime(item.timeFiled))}</td>
       <td>${escapeHtml(formatLocalTime(item.timeFiled))}</td>
@@ -602,6 +646,13 @@ function bindActions() {
     data.settings.nextMessageNumber = Number(data.settings.nextMessageNumber) + 1;
     saveData(`Message logged: ${entry.number}`);
   }));
+
+  document.getElementById("messageTable").addEventListener("click", (event) => {
+    if (event.target.closest("button")) return;
+    const row = event.target.closest("[data-message-id]");
+    if (!row) return;
+    focusMessageStation(row.dataset.messageId);
+  });
 
   document.getElementById("openSettings").addEventListener("click", () => document.getElementById("editSettings").click());
 
