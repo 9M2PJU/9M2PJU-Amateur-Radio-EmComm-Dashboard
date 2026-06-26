@@ -1,0 +1,9 @@
+{
+  "name": "9M2PJU Amateur Radio EmComm Dashboard",
+  "short_name": "EmComm",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#101820",
+  "theme_color": "#101820",
+  "description": "Offline-capable amateur radio emergency communications dashboard for net control, mapping, messages, tasks, and readiness."
+}

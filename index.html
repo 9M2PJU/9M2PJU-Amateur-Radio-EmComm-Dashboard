@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101820">
+    <title>9M2PJU Amateur Radio EmComm Dashboard</title>
+    <link rel="icon" href="%BASE_URL%favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="%BASE_URL%manifest.webmanifest">
+    <link rel="preconnect" href="https://tile.openstreetmap.org">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Amateur Radio Emergency Communications</p>
+          <h1>9M2PJU EmComm Dashboard</h1>
+        </div>
+        <div class="topbar-actions">
+          <button class="icon-button" id="installApp" title="Install app" aria-label="Install app">+</button>
+          <button class="icon-button" id="exportData" title="Export data" aria-label="Export data">⇩</button>
+          <label class="icon-button file-button" title="Import data" aria-label="Import data">
+            ⇧
+            <input id="importData" type="file" accept="application/json">
+          </label>
+        </div>
+      </header>
+
+      <main class="dashboard">
+        <section class="map-panel" aria-label="Operational map">
+          <div id="map"></div>
+          <div class="map-toolbar">
+            <button data-layer="stations" class="layer-toggle active">Stations</button>
+            <button data-layer="repeaters" class="layer-toggle active">Repeaters</button>
+            <button data-layer="incidents" class="layer-toggle active">Incidents</button>
+            <button data-layer="facilities" class="layer-toggle active">Facilities</button>
+          </div>
+          <div class="map-summary" id="mapSummary" aria-label="Map marker summary"></div>
+          <form class="quick-add" id="markerForm">
+            <select id="markerType" aria-label="Marker type">
+              <option value="incident">Incident</option>
+              <option value="station">Station</option>
+              <option value="facility">Facility</option>
+              <option value="repeater">Repeater</option>
+            </select>
+            <input id="markerName" placeholder="Name or callsign" required>
+            <input id="markerLat" placeholder="Lat" inputmode="decimal" required>
+            <input id="markerLng" placeholder="Lng" inputmode="decimal" required>
+            <button type="submit">Add</button>
+          </form>
+        </section>
+
+        <aside class="side-panel">
+          <section class="status-grid" aria-label="Incident status">
+            <article>
+              <span>Stations</span>
+              <strong id="stationCount">0</strong>
+            </article>
+            <article>
+              <span>Urgent</span>
+              <strong id="urgentCount">0</strong>
+            </article>
+            <article>
+              <span>Open Tasks</span>
+              <strong id="openTaskCount">0</strong>
+            </article>
+            <article>
+              <span>Online</span>
+              <strong id="onlineState">Ready</strong>
+            </article>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <h2>Net Control</h2>
+              <button id="addCheckin">Check In</button>
+            </div>
+            <div class="net-summary">
+              <div>
+                <span>Net</span>
+                <strong>District EmComm</strong>
+              </div>
+              <div>
+                <span>Control</span>
+                <strong>9M2PJU</strong>
+              </div>
+              <div>
+                <span>Period</span>
+                <strong id="clock">--:--</strong>
+              </div>
+            </div>
+            <ul class="compact-list" id="checkinList"></ul>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <h2>Active Frequencies</h2>
+              <button id="addFrequency">Add</button>
+            </div>
+            <div class="frequency-list" id="frequencyList"></div>
+          </section>
+        </aside>
+
+        <section class="workspace">
+          <nav class="tabs" aria-label="Dashboard sections">
+            <button class="tab active" data-tab="messages">Messages</button>
+            <button class="tab" data-tab="tasks">Tasks</button>
+            <button class="tab" data-tab="stations">Stations</button>
+            <button class="tab" data-tab="readiness">Readiness</button>
+            <button class="tab" data-tab="log">Log</button>
+          </nav>
+
+          <section class="tab-panel active" id="messages">
+            <div class="panel-heading">
+              <h2>Message Handling</h2>
+              <button id="addMessage">New Message</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>No.</th>
+                    <th>Priority</th>
+                    <th>From</th>
+                    <th>To</th>
+                    <th>Subject</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="messageTable"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="tab-panel" id="tasks">
+            <div class="panel-heading">
+              <h2>Tasking Board</h2>
+              <button id="addTask">Add Task</button>
+            </div>
+            <div class="kanban" id="taskBoard"></div>
+          </section>
+
+          <section class="tab-panel" id="stations">
+            <div class="panel-heading">
+              <h2>Station Directory</h2>
+              <button id="addStation">Add Station</button>
+            </div>
+            <div class="station-grid" id="stationDirectory"></div>
+          </section>
+
+          <section class="tab-panel" id="readiness">
+            <div class="panel-heading">
+              <h2>Readiness</h2>
+              <button id="addReadiness">Add Item</button>
+            </div>
+            <div class="readiness-grid" id="readinessGrid"></div>
+          </section>
+
+          <section class="tab-panel" id="log">
+            <div class="panel-heading">
+              <h2>Operational Log</h2>
+              <button id="clearLog">Clear</button>
+            </div>
+            <ol class="timeline" id="eventLog"></ol>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="entryDialog">
+      <form method="dialog" id="entryForm">
+        <h2 id="dialogTitle">Add Entry</h2>
+        <div id="dialogFields"></div>
+        <menu>
+          <button value="cancel">Cancel</button>
+          <button id="saveDialog" value="default">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
