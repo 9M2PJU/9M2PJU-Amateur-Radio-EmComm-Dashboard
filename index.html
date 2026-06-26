@@ -14,9 +14,10 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">Amateur Radio Emergency Communications</p>
-          <h1>9M2PJU EmComm Dashboard</h1>
+          <h1 id="appTitle">9M2PJU EmComm Dashboard</h1>
         </div>
         <div class="topbar-actions">
+          <button class="icon-button" id="openSettings" title="Settings" aria-label="Settings">⚙</button>
           <button class="icon-button" id="installApp" title="Install app" aria-label="Install app">+</button>
           <button class="icon-button" id="exportData" title="Export data" aria-label="Export data">⇩</button>
           <label class="icon-button file-button" title="Import data" aria-label="Import data">
@@ -78,14 +79,14 @@
             <div class="net-summary">
               <div>
                 <span>Net</span>
-                <strong>District EmComm</strong>
+                <strong id="netName">District EmComm</strong>
               </div>
               <div>
                 <span>Control</span>
-                <strong>9M2PJU</strong>
+                <strong id="netControl">9M2PJU</strong>
               </div>
               <div>
-                <span>Period</span>
+                <span>UTC</span>
                 <strong id="clock">--:--</strong>
               </div>
             </div>
@@ -107,6 +108,7 @@
             <button class="tab" data-tab="tasks">Tasks</button>
             <button class="tab" data-tab="stations">Stations</button>
             <button class="tab" data-tab="readiness">Readiness</button>
+            <button class="tab" data-tab="settings">Settings</button>
             <button class="tab" data-tab="log">Log</button>
           </nav>
 
@@ -120,11 +122,12 @@
                 <thead>
                   <tr>
                     <th>No.</th>
-                    <th>Priority</th>
+                    <th>Precedence</th>
                     <th>From</th>
                     <th>To</th>
                     <th>Subject</th>
                     <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="messageTable"></tbody>
@@ -156,6 +159,14 @@
             <div class="readiness-grid" id="readinessGrid"></div>
           </section>
 
+          <section class="tab-panel" id="settings">
+            <div class="panel-heading">
+              <h2>Station Settings</h2>
+              <button id="editSettings">Edit</button>
+            </div>
+            <div class="settings-grid" id="settingsGrid"></div>
+          </section>
+
           <section class="tab-panel" id="log">
             <div class="panel-heading">
               <h2>Operational Log</h2>
@@ -172,8 +183,8 @@
         <h2 id="dialogTitle">Add Entry</h2>
         <div id="dialogFields"></div>
         <menu>
-          <button value="cancel">Cancel</button>
-          <button id="saveDialog" value="default">Save</button>
+          <button type="button" id="cancelDialog">Cancel</button>
+          <button type="submit" id="saveDialog">Save</button>
         </menu>
       </form>
     </dialog>

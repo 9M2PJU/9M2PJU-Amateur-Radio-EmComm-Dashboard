@@ -339,12 +339,26 @@ dialog textarea {
 
 .frequency-card {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 
 .frequency-card strong {
   color: var(--yellow);
+}
+
+.card-actions,
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.card-actions button,
+.table-actions button {
+  min-height: 32px;
+  padding: 0 9px;
+  font-size: 0.82rem;
 }
 
 .workspace {
@@ -416,16 +430,26 @@ th {
 }
 
 .badge.priority,
-.badge.assigned {
+.badge.assigned,
+.badge.standby {
   background: rgba(240, 189, 79, 0.18);
   color: #ffd77d;
 }
 
 .badge.routine,
 .badge.done,
-.badge.available {
+.badge.available,
+.badge.active,
+.badge.ready {
   background: rgba(48, 196, 141, 0.16);
   color: #83e8bf;
+}
+
+.badge.canceled,
+.badge.unavailable,
+.badge.offline {
+  background: rgba(239, 106, 97, 0.18);
+  color: #ffafa9;
 }
 
 .kanban {
@@ -461,10 +485,30 @@ th {
 }
 
 .station-grid,
-.readiness-grid {
+.readiness-grid,
+.settings-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 10px;
+}
+
+.settings-grid article {
+  border: 1px solid var(--line);
+  background: #132028;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.settings-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin-bottom: 5px;
+}
+
+.settings-grid strong {
+  display: block;
+  overflow-wrap: anywhere;
 }
 
 .readiness-meter {
@@ -489,7 +533,7 @@ th {
 }
 
 dialog {
-  width: min(520px, calc(100vw - 24px));
+  width: min(640px, calc(100vw - 24px));
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -502,6 +546,7 @@ dialog::backdrop {
 
 #dialogFields {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -515,6 +560,10 @@ dialog::backdrop {
 dialog textarea {
   min-height: 90px;
   padding-top: 10px;
+}
+
+#dialogFields label:has(textarea) {
+  grid-column: 1 / -1;
 }
 
 dialog menu {
@@ -574,7 +623,8 @@ dialog menu {
 
   .status-grid,
   .net-summary,
-  .kanban {
+  .kanban,
+  #dialogFields {
     grid-template-columns: 1fr;
   }
 

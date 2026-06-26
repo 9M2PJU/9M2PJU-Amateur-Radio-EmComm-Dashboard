@@ -5,6 +5,21 @@ import "./styles.css";
 const storageKey = "emcomm-dashboard-v1";
 
 const seedData = {
+  settings: {
+    callsign: "9M2PJU",
+    operatorName: "Net Control Operator",
+    organization: "Amateur Radio EmComm",
+    netName: "District EmComm",
+    tacticalCall: "Net Control",
+    incidentName: "Local Emergency Net",
+    location: "Kuala Lumpur",
+    grid: "OJ03",
+    primaryFrequency: "145.500 MHz",
+    messagePrefix: "MSG",
+    nextMessageNumber: 4,
+    timezone: "UTC",
+    notes: "Use plain language, acknowledge all formal traffic, and keep an accurate log."
+  },
   markers: [
     { id: crypto.randomUUID(), type: "station", name: "9M2PJU Net Control", lat: 3.139, lng: 101.6869, status: "available", note: "Primary control station" },
     { id: crypto.randomUUID(), type: "repeater", name: "VHF Repeater", lat: 3.152, lng: 101.703, status: "online", note: "145.600 MHz -600 kHz tone 103.5" },
@@ -17,14 +32,14 @@ const seedData = {
     { id: crypto.randomUUID(), callsign: "9M4DIGI", role: "Winlink", status: "available", lastHeard: "14 min" }
   ],
   frequencies: [
-    { id: crypto.randomUUID(), name: "Primary Net", frequency: "145.500 MHz", mode: "FM Simplex", purpose: "Voice coordination" },
-    { id: crypto.randomUUID(), name: "Backup Net", frequency: "433.500 MHz", mode: "FM Simplex", purpose: "Fallback channel" },
-    { id: crypto.randomUUID(), name: "Digital", frequency: "144.390 MHz", mode: "APRS", purpose: "Position reports" }
+    { id: crypto.randomUUID(), name: "Primary Net", frequency: "145.500 MHz", mode: "FM Simplex", purpose: "Voice coordination", status: "Active" },
+    { id: crypto.randomUUID(), name: "Backup Net", frequency: "433.500 MHz", mode: "FM Simplex", purpose: "Fallback channel", status: "Standby" },
+    { id: crypto.randomUUID(), name: "Digital", frequency: "144.390 MHz", mode: "APRS", purpose: "Position reports", status: "Standby" }
   ],
   messages: [
-    { id: crypto.randomUUID(), number: "MSG-001", priority: "Emergency", from: "Relief Centre", to: "Net Control", subject: "Medical transport needed", status: "Sent" },
-    { id: crypto.randomUUID(), number: "MSG-002", priority: "Priority", from: "Mobile Team", to: "Logistics", subject: "Need drinking water", status: "Acknowledged" },
-    { id: crypto.randomUUID(), number: "MSG-003", priority: "Routine", from: "Net Control", to: "All stations", subject: "Operational period update", status: "Delivered" }
+    { id: crypto.randomUUID(), number: "MSG-001", priority: "Emergency", from: "Relief Centre", to: "Net Control", subject: "Medical transport needed", status: "Sent", handling: "Immediate", method: "Voice", text: "Medical transport requested for one patient.", timeFiled: new Date().toISOString() },
+    { id: crypto.randomUUID(), number: "MSG-002", priority: "Priority", from: "Mobile Team", to: "Logistics", subject: "Need drinking water", status: "Acknowledged", handling: "Priority", method: "Voice", text: "Additional drinking water needed at relief centre.", timeFiled: new Date().toISOString() },
+    { id: crypto.randomUUID(), number: "MSG-003", priority: "Routine", from: "Net Control", to: "All stations", subject: "Operational period update", status: "Delivered", handling: "Routine", method: "Net broadcast", text: "Operational period update sent to all stations.", timeFiled: new Date().toISOString() }
   ],
   tasks: [
     { id: crypto.randomUUID(), title: "Confirm repeater backup power", assignee: "9M4DIGI", priority: "Priority", status: "Assigned", location: "Hill site" },
@@ -51,7 +66,33 @@ function loadData() {
     localStorage.setItem(storageKey, JSON.stringify(seeded));
     return seeded;
   }
-  return JSON.parse(saved);
+  return migrateData(JSON.parse(saved));
+}
+
+function migrateData(saved) {
+  const migrated = {
+    ...seedData,
+    ...saved,
+    settings: { ...seedData.settings, ...(saved.settings || {}) },
+    markers: saved.markers || seedData.markers,
+    checkins: saved.checkins || seedData.checkins,
+    frequencies: (saved.frequencies || seedData.frequencies).map((item, index) => ({
+      status: index === 0 ? "Active" : "Standby",
+      ...item
+    })),
+    messages: (saved.messages || seedData.messages).map((item) => ({
+      handling: item.priority || "Routine",
+      method: "Voice",
+      text: item.subject || "",
+      timeFiled: new Date().toISOString(),
+      ...item
+    })),
+    tasks: saved.tasks || seedData.tasks,
+    readiness: saved.readiness || seedData.readiness,
+    log: saved.log || []
+  };
+  localStorage.setItem(storageKey, JSON.stringify(migrated));
+  return migrated;
 }
 
 function saveData(action) {
@@ -154,6 +195,7 @@ function renderMap() {
 
 function render() {
   renderMap();
+  renderSettings();
   document.getElementById("stationCount").textContent = data.checkins.length;
   document.getElementById("urgentCount").textContent = data.messages.filter((m) => m.priority === "Emergency").length;
   document.getElementById("openTaskCount").textContent = data.tasks.filter((t) => t.status !== "Done").length;
@@ -165,6 +207,32 @@ function render() {
   renderStations();
   renderReadiness();
   renderLog();
+}
+
+function renderSettings() {
+  const settings = data.settings;
+  document.getElementById("appTitle").textContent = `${settings.callsign} EmComm Dashboard`;
+  document.getElementById("netName").textContent = settings.netName;
+  document.getElementById("netControl").textContent = settings.callsign;
+  document.getElementById("settingsGrid").innerHTML = [
+    ["Callsign", settings.callsign],
+    ["Operator", settings.operatorName],
+    ["Organization", settings.organization],
+    ["Tactical Call", settings.tacticalCall],
+    ["Incident", settings.incidentName],
+    ["Location", settings.location],
+    ["Grid", settings.grid],
+    ["Primary Frequency", settings.primaryFrequency],
+    ["Message Prefix", settings.messagePrefix],
+    ["Next Message", String(settings.nextMessageNumber).padStart(3, "0")],
+    ["Clock", settings.timezone],
+    ["Notes", settings.notes]
+  ].map(([label, value]) => `
+    <article>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </article>
+  `).join("");
 }
 
 function renderCheckins() {
@@ -181,10 +249,15 @@ function renderFrequencies() {
     <article class="frequency-card">
       <div>
         <strong>${escapeHtml(item.frequency)}</strong>
-        <span class="meta">${escapeHtml(item.name)} · ${escapeHtml(item.mode)}</span>
+        <span class="meta">${escapeHtml(item.name)} · ${escapeHtml(item.mode)} · <span class="badge ${item.status.toLowerCase()}">${escapeHtml(item.status)}</span></span>
         <span class="muted">${escapeHtml(item.purpose)}</span>
       </div>
-      <button data-delete="frequency" data-id="${item.id}" title="Delete frequency">×</button>
+      <div class="card-actions">
+        <button data-action="activate-frequency" data-id="${item.id}" title="Set active">Set</button>
+        <button data-action="edit-frequency" data-id="${item.id}" title="Edit frequency">Edit</button>
+        <button data-action="cancel-frequency" data-id="${item.id}" title="Cancel frequency">Cancel</button>
+        <button data-delete="frequency" data-id="${item.id}" title="Delete frequency">×</button>
+      </div>
     </article>
   `).join("");
 }
@@ -198,6 +271,13 @@ function renderMessages() {
       <td>${escapeHtml(item.to)}</td>
       <td>${escapeHtml(item.subject)}</td>
       <td>${escapeHtml(item.status)}</td>
+      <td>
+        <div class="table-actions">
+          <button data-action="edit-message" data-id="${item.id}">Edit</button>
+          <button data-action="advance-message" data-id="${item.id}">Next</button>
+          <button data-action="cancel-message" data-id="${item.id}">Cancel</button>
+        </div>
+      </td>
     </tr>
   `).join("");
 }
@@ -252,21 +332,25 @@ function renderLog() {
 
 function fieldsToHtml(fields) {
   return fields.map((field) => {
+    const value = field.value == null ? "" : String(field.value);
+    const required = field.required === false ? "" : "required";
     if (field.type === "select") {
-      return `<label>${field.label}<select name="${field.name}">${field.options.map((option) => `<option>${option}</option>`).join("")}</select></label>`;
+      return `<label>${field.label}<select name="${field.name}" ${required}>${field.options.map((option) => `<option ${option === value ? "selected" : ""}>${option}</option>`).join("")}</select></label>`;
     }
     if (field.type === "textarea") {
-      return `<label>${field.label}<textarea name="${field.name}" required></textarea></label>`;
+      return `<label>${field.label}<textarea name="${field.name}" ${required}>${escapeHtml(value)}</textarea></label>`;
     }
-    return `<label>${field.label}<input name="${field.name}" type="${field.type || "text"}" required></label>`;
+    return `<label>${field.label}<input name="${field.name}" type="${field.type || "text"}" value="${escapeAttribute(value)}" ${required}></label>`;
   }).join("");
 }
 
-function openEntry(title, fields, onSave) {
+function openEntry(title, fields, onSave, saveLabel = "Save") {
   const dialog = document.getElementById("entryDialog");
   const form = document.getElementById("entryForm");
   document.getElementById("dialogTitle").textContent = title;
   document.getElementById("dialogFields").innerHTML = fieldsToHtml(fields);
+  document.getElementById("saveDialog").textContent = saveLabel;
+  document.getElementById("cancelDialog").onclick = () => dialog.close();
   form.onsubmit = (event) => {
     event.preventDefault();
     const formData = Object.fromEntries(new FormData(form).entries());
@@ -274,6 +358,67 @@ function openEntry(title, fields, onSave) {
     dialog.close();
   };
   dialog.showModal();
+}
+
+function frequencyFields(item = {}) {
+  return [
+    { label: "Name", name: "name", value: item.name },
+    { label: "Frequency", name: "frequency", value: item.frequency },
+    { label: "Mode", name: "mode", value: item.mode },
+    { label: "Purpose", name: "purpose", value: item.purpose },
+    { label: "Status", name: "status", type: "select", value: item.status || "Standby", options: ["Active", "Standby", "Canceled"] }
+  ];
+}
+
+function messageFields(item = {}) {
+  return [
+    { label: "Message number", name: "number", value: item.number || nextMessageNumber() },
+    { label: "Precedence", name: "priority", type: "select", value: item.priority || "Routine", options: ["Routine", "Priority", "Emergency", "Welfare"] },
+    { label: "Handling", name: "handling", type: "select", value: item.handling || "Routine", options: ["Routine", "Priority", "Immediate", "Health and welfare"] },
+    { label: "From", name: "from", value: item.from || data.settings.tacticalCall },
+    { label: "To", name: "to", value: item.to },
+    { label: "Subject", name: "subject", value: item.subject },
+    { label: "Method", name: "method", type: "select", value: item.method || "Voice", options: ["Voice", "Winlink", "Packet", "APRS", "Messenger", "Phone relay"] },
+    { label: "Status", name: "status", type: "select", value: item.status || "Drafted", options: ["Drafted", "Sent", "Acknowledged", "Delivered", "Canceled"] },
+    { label: "Message text", name: "text", type: "textarea", value: item.text || item.subject || "" }
+  ];
+}
+
+function settingsFields() {
+  const settings = data.settings;
+  return [
+    { label: "Callsign", name: "callsign", value: settings.callsign },
+    { label: "Operator name", name: "operatorName", value: settings.operatorName },
+    { label: "Organization", name: "organization", value: settings.organization },
+    { label: "Net name", name: "netName", value: settings.netName },
+    { label: "Tactical call", name: "tacticalCall", value: settings.tacticalCall },
+    { label: "Incident name", name: "incidentName", value: settings.incidentName },
+    { label: "Location", name: "location", value: settings.location },
+    { label: "Grid locator", name: "grid", value: settings.grid },
+    { label: "Primary frequency", name: "primaryFrequency", value: settings.primaryFrequency },
+    { label: "Message prefix", name: "messagePrefix", value: settings.messagePrefix },
+    { label: "Next message number", name: "nextMessageNumber", type: "number", value: settings.nextMessageNumber },
+    { label: "Clock", name: "timezone", type: "select", value: settings.timezone, options: ["UTC", "Local"] },
+    { label: "Operating notes", name: "notes", type: "textarea", value: settings.notes }
+  ];
+}
+
+function nextMessageNumber() {
+  return `${data.settings.messagePrefix}-${String(data.settings.nextMessageNumber).padStart(3, "0")}`;
+}
+
+function normalizeMessage(entry, existing = {}) {
+  return {
+    ...existing,
+    ...entry,
+    number: entry.number.trim().toUpperCase(),
+    from: entry.from.trim(),
+    to: entry.to.trim(),
+    subject: entry.subject.trim(),
+    text: entry.text.trim(),
+    timeFiled: existing.timeFiled || new Date().toISOString(),
+    operator: data.settings.callsign
+  };
 }
 
 function bindActions() {
@@ -304,26 +449,29 @@ function bindActions() {
     saveData(`Station checked in: ${entry.callsign}`);
   }));
 
-  document.getElementById("addFrequency").addEventListener("click", () => openEntry("Add Frequency", [
-    { label: "Name", name: "name" },
-    { label: "Frequency", name: "frequency" },
-    { label: "Mode", name: "mode" },
-    { label: "Purpose", name: "purpose" }
-  ], (entry) => {
+  document.getElementById("addFrequency").addEventListener("click", () => openEntry("Add Frequency", frequencyFields(), (entry) => {
     data.frequencies.push({ id: crypto.randomUUID(), ...entry });
     saveData(`Frequency added: ${entry.frequency}`);
   }));
 
-  document.getElementById("addMessage").addEventListener("click", () => openEntry("New Message", [
-    { label: "Message number", name: "number" },
-    { label: "Priority", name: "priority", type: "select", options: ["Routine", "Priority", "Emergency"] },
-    { label: "From", name: "from" },
-    { label: "To", name: "to" },
-    { label: "Subject", name: "subject" },
-    { label: "Status", name: "status", type: "select", options: ["Drafted", "Sent", "Acknowledged", "Delivered"] }
-  ], (entry) => {
-    data.messages.unshift({ id: crypto.randomUUID(), ...entry });
+  document.getElementById("addMessage").addEventListener("click", () => openEntry("New Message", messageFields(), (entry) => {
+    data.messages.unshift({ id: crypto.randomUUID(), ...normalizeMessage(entry) });
+    data.settings.nextMessageNumber = Number(data.settings.nextMessageNumber) + 1;
     saveData(`Message logged: ${entry.number}`);
+  }));
+
+  document.getElementById("openSettings").addEventListener("click", () => document.getElementById("editSettings").click());
+
+  document.getElementById("editSettings").addEventListener("click", () => openEntry("Station Settings", settingsFields(), (entry) => {
+    data.settings = {
+      ...data.settings,
+      ...entry,
+      callsign: entry.callsign.trim().toUpperCase(),
+      nextMessageNumber: Math.max(1, Number(entry.nextMessageNumber) || 1)
+    };
+    const control = data.checkins.find((item) => item.role === "Net Control");
+    if (control) control.callsign = data.settings.callsign;
+    saveData(`Settings updated for ${data.settings.callsign}`);
   }));
 
   document.getElementById("addTask").addEventListener("click", () => openEntry("Add Task", [
@@ -350,6 +498,7 @@ function bindActions() {
   }));
 
   document.getElementById("clearLog").addEventListener("click", () => {
+    if (!confirm("Clear the operational log on this device?")) return;
     data.log = [];
     saveData("Operational log cleared.");
   });
@@ -372,9 +521,16 @@ function bindActions() {
   });
 
   document.addEventListener("click", (event) => {
+    const actionButton = event.target.closest("[data-action]");
+    if (actionButton) {
+      handleAction(actionButton.dataset.action, actionButton.dataset.id);
+      return;
+    }
+
     const deleteButton = event.target.closest("[data-delete]");
     if (!deleteButton) return;
     if (deleteButton.dataset.delete === "frequency") {
+      if (!confirm("Delete this frequency from this device?")) return;
       data.frequencies = data.frequencies.filter((item) => item.id !== deleteButton.dataset.id);
       saveData("Frequency removed.");
     }
@@ -400,8 +556,68 @@ function bindActions() {
   });
 }
 
+function handleAction(action, id) {
+  if (action === "activate-frequency") {
+    data.frequencies = data.frequencies.map((item) => ({
+      ...item,
+      status: item.id === id ? "Active" : item.status === "Active" ? "Standby" : item.status
+    }));
+    const active = data.frequencies.find((item) => item.id === id);
+    saveData(`Active frequency set: ${active?.frequency || "unknown"}`);
+    return;
+  }
+
+  if (action === "cancel-frequency") {
+    const item = data.frequencies.find((frequency) => frequency.id === id);
+    if (!item) return;
+    item.status = item.status === "Canceled" ? "Standby" : "Canceled";
+    saveData(`Frequency ${item.status.toLowerCase()}: ${item.frequency}`);
+    return;
+  }
+
+  if (action === "edit-frequency") {
+    const item = data.frequencies.find((frequency) => frequency.id === id);
+    if (!item) return;
+    openEntry("Edit Frequency", frequencyFields(item), (entry) => {
+      Object.assign(item, entry);
+      saveData(`Frequency updated: ${entry.frequency}`);
+    });
+    return;
+  }
+
+  if (action === "edit-message") {
+    const item = data.messages.find((message) => message.id === id);
+    if (!item) return;
+    openEntry("Edit Message", messageFields(item), (entry) => {
+      Object.assign(item, normalizeMessage(entry, item));
+      saveData(`Message updated: ${item.number}`);
+    });
+    return;
+  }
+
+  if (action === "advance-message") {
+    const item = data.messages.find((message) => message.id === id);
+    if (!item) return;
+    const flow = ["Drafted", "Sent", "Acknowledged", "Delivered"];
+    const next = flow[Math.min(flow.indexOf(item.status) + 1, flow.length - 1)] || "Sent";
+    item.status = next;
+    saveData(`Message ${item.number} marked ${next}`);
+    return;
+  }
+
+  if (action === "cancel-message") {
+    const item = data.messages.find((message) => message.id === id);
+    if (!item) return;
+    item.status = item.status === "Canceled" ? "Drafted" : "Canceled";
+    saveData(`Message ${item.number} marked ${item.status}`);
+  }
+}
+
 function tickClock() {
-  document.getElementById("clock").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const now = new Date();
+  document.getElementById("clock").textContent = data.settings.timezone === "UTC"
+    ? `${now.toISOString().slice(11, 16)}Z`
+    : now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function escapeHtml(value) {
@@ -412,6 +628,10 @@ function escapeHtml(value) {
     '"': "&quot;",
     "'": "&#039;"
   }[character]));
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replace(/`/g, "&#096;");
 }
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
