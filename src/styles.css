@@ -444,6 +444,27 @@ dialog input[type="color"] {
   gap: 8px;
 }
 
+.record-fields {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.record-fields span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.record-fields b {
+  min-width: 72px;
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 .frequency-list {
   display: grid;
   gap: 8px;

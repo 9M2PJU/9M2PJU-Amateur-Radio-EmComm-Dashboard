@@ -574,7 +574,11 @@ function renderCheckins() {
   document.getElementById("checkinList").innerHTML = data.checkins.length ? data.checkins.map((item) => `
     <li>
       <strong>${escapeHtml(item.callsign)}</strong>
-      <span class="meta">${escapeHtml(item.role)} · ${escapeHtml(item.lastHeard)} · <span class="badge ${item.status}">${escapeHtml(item.status)}</span></span>
+      <div class="record-fields">
+        <span><b>Role</b>${escapeHtml(item.role)}</span>
+        <span><b>Last heard</b>${escapeHtml(item.lastHeard)}</span>
+        <span><b>Status</b><span class="badge ${item.status}">${escapeHtml(item.status)}</span></span>
+      </div>
     </li>
   `).join("") : `<li><strong>No stations checked in</strong><span class="meta">Use Check In when stations join the net.</span></li>`;
 }
@@ -647,8 +651,11 @@ function renderStations() {
   document.getElementById("stationDirectory").innerHTML = data.checkins.length ? data.checkins.map((item) => `
     <article class="station-card">
       <strong>${escapeHtml(item.callsign)}</strong>
-      <span class="badge ${item.status}">${escapeHtml(item.status)}</span>
-      <span class="meta">${escapeHtml(item.role)} · Last heard ${escapeHtml(item.lastHeard)}</span>
+      <div class="record-fields">
+        <span><b>Role</b>${escapeHtml(item.role)}</span>
+        <span><b>Last heard</b>${escapeHtml(item.lastHeard)}</span>
+        <span><b>Status</b><span class="badge ${item.status}">${escapeHtml(item.status)}</span></span>
+      </div>
       <div class="card-actions">
         <button data-action="edit-station" data-id="${item.id}">Edit</button>
         <button data-delete="station" data-id="${item.id}">Trash</button>
