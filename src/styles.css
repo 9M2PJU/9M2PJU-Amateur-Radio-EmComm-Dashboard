@@ -286,6 +286,57 @@ dialog textarea {
   font-size: 0.78rem;
 }
 
+.station-context-menu {
+  position: absolute;
+  z-index: 800;
+  display: grid;
+  gap: 6px;
+  min-width: 150px;
+  max-width: 220px;
+  padding: 8px;
+  border: 1px solid rgba(238, 246, 244, 0.22);
+  border-radius: 6px;
+  background: rgba(15, 23, 29, 0.96);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+}
+
+.station-context-menu strong {
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+}
+
+.station-context-menu button {
+  justify-content: flex-start;
+  min-height: 32px;
+}
+
+.relocate-banner {
+  position: absolute;
+  z-index: 760;
+  left: 50%;
+  bottom: 72px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(520px, calc(100% - 24px));
+  padding: 8px;
+  border: 1px solid rgba(238, 246, 244, 0.2);
+  border-radius: 8px;
+  background: rgba(15, 23, 29, 0.94);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+  transform: translateX(-50%);
+}
+
+.relocate-banner strong {
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+}
+
+.relocate-banner span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .side-panel,
 .workspace,
 .panel {
@@ -701,5 +752,13 @@ dialog menu {
 
   .map-hint {
     display: none;
+  }
+
+  .relocate-banner {
+    right: 12px;
+    left: 12px;
+    bottom: 92px;
+    flex-wrap: wrap;
+    transform: none;
   }
 }

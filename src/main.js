@@ -58,6 +58,7 @@ let data = loadData();
 let map;
 let layerGroups = {};
 let installPrompt;
+let pendingRelocateStationId = null;
 
 function loadData() {
   const saved = localStorage.getItem(storageKey);
@@ -154,8 +155,19 @@ function initMap() {
   });
 
   map.on("contextmenu", (event) => {
+    if (pendingRelocateStationId) return;
     openStationMarkerDialog(event.latlng.lat, event.latlng.lng);
   });
+
+  map.on("click", (event) => {
+    if (pendingRelocateStationId) {
+      relocateStationMarker(pendingRelocateStationId, event.latlng);
+      return;
+    }
+    hideStationContextMenu();
+  });
+
+  map.on("movestart zoomstart", hideStationContextMenu);
 }
 
 function renderMap() {
@@ -191,10 +203,65 @@ function renderMap() {
   data.markers.forEach((item) => {
     const groupName = `${item.type}s`;
     const group = layerGroups[groupName] || layerGroups.incidents;
-    L.marker([item.lat, item.lng], { icon: markerIcon(item.type) })
+    const marker = L.marker([item.lat, item.lng], { icon: markerIcon(item.type) })
       .bindPopup(`<strong>${escapeHtml(item.name)}</strong><br>${escapeHtml(item.status || item.type)}<br>${escapeHtml(item.note || "")}<br><span>${item.lat.toFixed(5)}, ${item.lng.toFixed(5)}</span>`)
       .addTo(group);
+
+    if (item.type === "station") {
+      marker.on("contextmenu", (event) => {
+        L.DomEvent.stop(event);
+        showStationContextMenu(item, event.latlng);
+      });
+    }
   });
+}
+
+function showStationContextMenu(station, latlng) {
+  hideStationContextMenu();
+  const point = map.latLngToContainerPoint(latlng);
+  const menu = document.createElement("div");
+  menu.className = "station-context-menu";
+  menu.id = "stationContextMenu";
+  menu.style.left = `${Math.max(8, point.x)}px`;
+  menu.style.top = `${Math.max(8, point.y)}px`;
+  menu.innerHTML = `
+    <strong>${escapeHtml(station.name)}</strong>
+    <button data-action="start-relocate-station" data-id="${escapeHtml(station.id)}">Relocate</button>
+    <button data-action="close-station-menu">Cancel</button>
+  `;
+  document.querySelector(".map-panel").appendChild(menu);
+}
+
+function hideStationContextMenu() {
+  document.getElementById("stationContextMenu")?.remove();
+}
+
+function setRelocateBanner(station) {
+  clearRelocateBanner();
+  const banner = document.createElement("div");
+  banner.className = "relocate-banner";
+  banner.id = "relocateBanner";
+  banner.innerHTML = `
+    <strong>Relocating ${escapeHtml(station.name)}</strong>
+    <span>Click the new map position.</span>
+    <button data-action="cancel-relocate-station">Cancel</button>
+  `;
+  document.querySelector(".map-panel").appendChild(banner);
+}
+
+function clearRelocateBanner() {
+  document.getElementById("relocateBanner")?.remove();
+}
+
+function relocateStationMarker(id, latlng) {
+  const station = data.markers.find((item) => item.id === id && item.type === "station");
+  if (!station) return;
+  station.lat = Number(latlng.lat);
+  station.lng = Number(latlng.lng);
+  station.note = station.note ? `${station.note} | Relocated ${formatUtcTime(new Date().toISOString())}` : `Relocated ${formatUtcTime(new Date().toISOString())}`;
+  pendingRelocateStationId = null;
+  clearRelocateBanner();
+  saveData(`Station relocated: ${station.name}`);
 }
 
 function render() {
@@ -633,6 +700,27 @@ function bindActions() {
 }
 
 function handleAction(action, id) {
+  if (action === "start-relocate-station") {
+    const station = data.markers.find((item) => item.id === id && item.type === "station");
+    if (!station) return;
+    pendingRelocateStationId = id;
+    hideStationContextMenu();
+    setRelocateBanner(station);
+    map?.closePopup();
+    return;
+  }
+
+  if (action === "cancel-relocate-station") {
+    pendingRelocateStationId = null;
+    clearRelocateBanner();
+    return;
+  }
+
+  if (action === "close-station-menu") {
+    hideStationContextMenu();
+    return;
+  }
+
   if (action === "activate-frequency") {
     data.frequencies = data.frequencies.map((item) => ({
       ...item,
