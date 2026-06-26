@@ -331,6 +331,10 @@ function iaruMessageHtml(message) {
   const currentPrecedence = String(message.priority || "Routine");
   const text = String(message.text || message.subject || "").trim();
   const wordCount = message.wordCount || countMessageWords(text);
+  const messageLines = Array.from({ length: 4 }, (_, index) => {
+    const line = text.split(/\n/)[index] || (index === 0 ? text : "");
+    return `<div>${escapeHtml(line)}</div>`;
+  }).join("");
   return `
     <section class="iaru-form" aria-label="IARU message form">
       <div class="iaru-title-row">
@@ -361,18 +365,42 @@ function iaruMessageHtml(message) {
         </tr>
       </table>
       <div class="iaru-line-field">
-        <strong>To:</strong> <span>(BLOCK LETTERS)</span>
+        <span><strong>To:</strong> (BLOCK LETTERS):</span>
         <div>${escapeHtml(message.to)}</div>
       </div>
-      <div class="iaru-message-text">${escapeHtml(text)}</div>
+      <div class="iaru-message-lines">${messageLines}</div>
+      <div class="iaru-double-line"></div>
       <div class="iaru-line-field">
-        <strong>From:</strong> <span>(BLOCK LETTERS)</span>
+        <span><strong>From:</strong> (BLOCK LETTERS):</span>
         <div>${escapeHtml(message.from)}</div>
       </div>
-      <div class="iaru-footer">
-        <span>Frequency: ${escapeHtml(message.frequency || activeFrequencyLabel())}</span>
-        <span>Status: ${escapeHtml(message.status)}</span>
-        <span>Operator: ${escapeHtml(message.operator || data.settings.callsign)}</span>
+      <div class="iaru-double-line"></div>
+      <div class="iaru-operator-title">For radio operator use only:</div>
+      <div class="iaru-operator-grid">
+        <table>
+          <tr>
+            <th>RECEIVED FROM</th>
+            <th>DATE</th>
+            <th>TIME</th>
+          </tr>
+          <tr>
+            <td>${escapeHtml(message.from)}</td>
+            <td></td>
+            <td></td>
+          </tr>
+        </table>
+        <table>
+          <tr>
+            <th>SENT TO</th>
+            <th>DATE</th>
+            <th>TIME</th>
+          </tr>
+          <tr>
+            <td>${escapeHtml(message.to)}</td>
+            <td></td>
+            <td></td>
+          </tr>
+        </table>
       </div>
     </section>
   `;
@@ -380,21 +408,34 @@ function iaruMessageHtml(message) {
 
 function iaruPrintStyles() {
   return `
-    body { margin: 0; padding: 18mm; color: #111; background: #fff; font-family: Arial, Helvetica, sans-serif; }
+    body { margin: 0; padding: 10mm; color: #111; background: #fff; font-family: Arial, Helvetica, sans-serif; }
     .iaru-form { max-width: 190mm; margin: 0 auto; }
-    .iaru-title-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; margin-bottom: 10px; }
+    .iaru-title-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; margin-bottom: 8px; }
     .iaru-title-row h1 { margin: 0; font-size: 24px; font-weight: 500; letter-spacing: 0; text-align: center; }
-    .iaru-mark { justify-self: end; width: 48px; height: 58px; border: 2px solid #111; display: grid; place-items: center; font-size: 10px; font-weight: 700; transform: rotate(-30deg); }
+    .iaru-mark { justify-self: center; width: 42px; height: 54px; border: 2px solid #111; display: grid; place-items: center; font-size: 9px; font-weight: 700; transform: rotate(-30deg); }
     .iaru-header-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
-    .iaru-header-table th, .iaru-header-table td { border: 1px solid #111; padding: 5px; vertical-align: top; height: 46px; }
+    .iaru-header-table th, .iaru-header-table td { border: 1px solid #111; padding: 4px; vertical-align: top; height: 58px; }
+    .iaru-header-table th:nth-child(1) { width: 9%; }
+    .iaru-header-table th:nth-child(2) { width: 16%; }
+    .iaru-header-table th:nth-child(3) { width: 15%; }
+    .iaru-header-table th:nth-child(4) { width: 14%; }
+    .iaru-header-table th:nth-child(5) { width: 21%; }
+    .iaru-header-table th:nth-child(6) { width: 12%; }
+    .iaru-header-table th:nth-child(7) { width: 13%; }
     .iaru-header-table th { text-align: center; font-size: 11px; line-height: 1.1; }
     .iaru-header-table th span { font-size: 9px; font-weight: 400; }
     .iaru-check { white-space: nowrap; font-size: 10px; line-height: 1.35; }
-    .iaru-line-field { margin-top: 8px; font-size: 13px; }
+    .iaru-line-field { margin-top: 6px; font-size: 13px; }
     .iaru-line-field span { font-size: 10px; }
-    .iaru-line-field div { min-height: 28px; border-bottom: 1px solid #111; padding: 7px 0 3px; font-size: 14px; letter-spacing: 0; }
-    .iaru-message-text { min-height: 130px; margin-top: 10px; padding: 10px 0; border-top: 1px solid #111; border-bottom: 3px double #111; white-space: pre-wrap; line-height: 2.05; font-size: 14px; }
-    .iaru-footer { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; color: #333; font-size: 10px; }
+    .iaru-line-field div { min-height: 24px; border-bottom: 1px solid #111; padding: 6px 0 3px; font-size: 14px; letter-spacing: 0; }
+    .iaru-message-lines { margin-top: 4px; }
+    .iaru-message-lines div { min-height: 40px; border-bottom: 1px solid #111; padding: 8px 0 3px; font-size: 14px; }
+    .iaru-double-line { height: 5px; margin-top: 2px; border-top: 1px solid #111; border-bottom: 1px solid #111; }
+    .iaru-operator-title { margin-top: 4px; font-size: 16px; font-weight: 400; }
+    .iaru-operator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 52px; margin-top: 4px; }
+    .iaru-operator-grid table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+    .iaru-operator-grid th, .iaru-operator-grid td { border: 1px solid #111; height: 20px; padding: 3px; text-align: center; font-weight: 400; }
+    .iaru-operator-grid th:first-child { width: 39%; }
     @page { size: A4; margin: 12mm; }
   `;
 }
