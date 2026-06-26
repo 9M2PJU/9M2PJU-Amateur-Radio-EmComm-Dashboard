@@ -258,6 +258,11 @@ dialog textarea {
   padding: 0 10px;
 }
 
+dialog input[type="color"] {
+  width: 100%;
+  padding: 4px;
+}
+
 .quick-add input {
   min-width: 120px;
   flex: 1;

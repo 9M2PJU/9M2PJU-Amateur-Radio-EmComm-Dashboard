@@ -111,8 +111,8 @@ function saveData(action) {
   render();
 }
 
-function markerColor(type) {
-  return {
+function markerColor(type, customColor) {
+  return sanitizeMarkerColor(customColor) || {
     station: "#30c48d",
     repeater: "#69a7ff",
     incident: "#ef6a61",
@@ -120,10 +120,15 @@ function markerColor(type) {
   }[type] || "#eef6f4";
 }
 
-function markerIcon(type) {
+function sanitizeMarkerColor(value) {
+  const color = String(value || "").trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : "";
+}
+
+function markerIcon(type, customColor) {
   return L.divIcon({
     className: "custom-marker",
-    html: `<span style="background:${markerColor(type)}"></span>`,
+    html: `<span style="background:${markerColor(type, customColor)}"></span>`,
     iconSize: [18, 18],
     iconAnchor: [9, 9]
   });
@@ -179,7 +184,7 @@ function initMap() {
 function renderMap() {
   document.getElementById("mapSummary").innerHTML = data.markers.slice(0, 4).map((item) => `
     <article>
-      <span class="fallback-dot" style="background:${markerColor(item.type)}"></span>
+      <span class="fallback-dot" style="background:${markerColor(item.type, item.color)}"></span>
       <div>
         <strong>${escapeHtml(item.name)}</strong>
         <span>${escapeHtml(item.type)} · ${escapeHtml(item.status || "")}</span>
@@ -192,7 +197,7 @@ function renderMap() {
       <div class="fallback-map-grid">
         ${data.markers.map((item) => `
           <article>
-            <span class="fallback-dot" style="background:${markerColor(item.type)}"></span>
+            <span class="fallback-dot" style="background:${markerColor(item.type, item.color)}"></span>
             <div>
               <strong>${escapeHtml(item.name)}</strong>
               <span class="meta">${escapeHtml(item.type)} · ${escapeHtml(item.status || "")}</span>
@@ -210,7 +215,7 @@ function renderMap() {
   data.markers.forEach((item) => {
     const groupName = `${item.type}s`;
     const group = layerGroups[groupName] || layerGroups.incidents;
-    const marker = L.marker([item.lat, item.lng], { icon: markerIcon(item.type) })
+    const marker = L.marker([item.lat, item.lng], { icon: markerIcon(item.type, item.color) })
       .bindPopup(`<strong>${escapeHtml(item.name)}</strong><br>${escapeHtml(item.status || item.type)}<br>${escapeHtml(item.note || "")}<br><span>${item.lat.toFixed(5)}, ${item.lng.toFixed(5)}</span>`)
       .addTo(group);
 
@@ -630,6 +635,7 @@ function stationMarkerFields(lat, lng) {
   return [
     { label: "Callsign or station name", name: "name", value: "" },
     { label: "Status", name: "status", type: "select", value: "available", options: ["available", "assigned", "mobile", "offline", "needs assistance"] },
+    { label: "Marker color", name: "color", type: "color", value: markerColor("station") },
     { label: "Latitude", name: "lat", type: "number", value: lat.toFixed(6) },
     { label: "Longitude", name: "lng", type: "number", value: lng.toFixed(6) },
     { label: "Notes", name: "note", type: "textarea", value: "Added by right-click on map" }
@@ -645,6 +651,7 @@ function openStationMarkerDialog(lat, lng) {
       lat: Number(entry.lat),
       lng: Number(entry.lng),
       status: entry.status,
+      color: sanitizeMarkerColor(entry.color) || markerColor("station"),
       note: entry.note.trim()
     };
     if (!marker.name || !Number.isFinite(marker.lat) || !Number.isFinite(marker.lng)) return;
@@ -905,6 +912,7 @@ function handleAction(action, id) {
         status: entry.status,
         lat: Number(entry.lat),
         lng: Number(entry.lng),
+        color: sanitizeMarkerColor(entry.color) || markerColor("station"),
         note: entry.note.trim()
       };
       if (!marker.name || !Number.isFinite(marker.lat) || !Number.isFinite(marker.lng)) return;
