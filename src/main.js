@@ -18,7 +18,7 @@ const seedData = {
     primaryFrequency: "145.500 MHz",
     messagePrefix: "MSG",
     nextMessageNumber: 4,
-    timezone: "UTC",
+    timezone: "Local",
     notes: "Use plain language, acknowledge all formal traffic, and keep an accurate log."
   },
   markers: [
