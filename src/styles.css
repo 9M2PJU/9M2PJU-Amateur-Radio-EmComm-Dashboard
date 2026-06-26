@@ -776,16 +776,11 @@ dialog menu {
   text-align: center;
 }
 
-.iaru-mark {
+.iaru-logo {
   justify-self: center;
-  width: 42px;
-  height: 54px;
-  border: 2px solid #111111;
-  display: grid;
-  place-items: center;
-  font-size: 0.64rem;
-  font-weight: 800;
-  transform: rotate(-30deg);
+  width: 48px;
+  height: 64px;
+  object-fit: contain;
 }
 
 .iaru-header-table {

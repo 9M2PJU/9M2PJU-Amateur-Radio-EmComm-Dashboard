@@ -331,6 +331,8 @@ function iaruMessageHtml(message) {
   const currentPrecedence = String(message.priority || "Routine");
   const text = String(message.text || message.subject || "").trim();
   const wordCount = message.wordCount || countMessageWords(text);
+  const operatorCallsign = String(data.settings.callsign || message.operator || "").trim().toUpperCase();
+  const iaruLogoUrl = assetUrl("iaru-logo.png");
   const messageLines = Array.from({ length: 4 }, (_, index) => {
     const line = text.split(/\n/)[index] || (index === 0 ? text : "");
     return `<div>${escapeHtml(line)}</div>`;
@@ -340,7 +342,7 @@ function iaruMessageHtml(message) {
       <div class="iaru-title-row">
         <div></div>
         <h1>MESSAGE</h1>
-        <div class="iaru-mark">IARU</div>
+        <img class="iaru-logo" src="${escapeHtml(iaruLogoUrl)}" alt="IARU logo">
       </div>
       <table class="iaru-header-table">
         <tr>
@@ -384,7 +386,7 @@ function iaruMessageHtml(message) {
             <th>TIME</th>
           </tr>
           <tr>
-            <td>${escapeHtml(message.from)}</td>
+            <td>${escapeHtml(operatorCallsign)}</td>
             <td></td>
             <td></td>
           </tr>
@@ -412,7 +414,7 @@ function iaruPrintStyles() {
     .iaru-form { max-width: 190mm; margin: 0 auto; }
     .iaru-title-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; margin-bottom: 8px; }
     .iaru-title-row h1 { margin: 0; font-size: 24px; font-weight: 500; letter-spacing: 0; text-align: center; }
-    .iaru-mark { justify-self: center; width: 42px; height: 54px; border: 2px solid #111; display: grid; place-items: center; font-size: 9px; font-weight: 700; transform: rotate(-30deg); }
+    .iaru-logo { justify-self: center; width: 48px; height: 64px; object-fit: contain; }
     .iaru-header-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
     .iaru-header-table th, .iaru-header-table td { border: 1px solid #111; padding: 4px; vertical-align: top; height: 58px; }
     .iaru-header-table th:nth-child(1) { width: 9%; }
@@ -466,8 +468,23 @@ function printIaruMessage(messageId) {
     </html>
   `);
   printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
+  const runPrint = () => {
+    printWindow.focus();
+    printWindow.print();
+  };
+  const logo = printWindow.document.querySelector(".iaru-logo");
+  if (logo && !logo.complete) {
+    logo.addEventListener("load", runPrint, { once: true });
+    logo.addEventListener("error", runPrint, { once: true });
+    return;
+  }
+  runPrint();
+}
+
+function assetUrl(path) {
+  const cleanPath = String(path).replace(/^\/+/, "");
+  const base = new URL(import.meta.env.BASE_URL || "./", window.location.href);
+  return new URL(cleanPath, base).href;
 }
 
 function validatedImport(rawData) {
