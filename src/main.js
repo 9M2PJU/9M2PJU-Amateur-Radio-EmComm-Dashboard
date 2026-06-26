@@ -103,6 +103,7 @@ let layerGroups = {};
 let markerRefs = new Map();
 let installPrompt;
 let pendingRelocateMarkerId = null;
+let pendingAddMarkerType = null;
 
 function loadData() {
   const saved = readLocalData();
@@ -367,13 +368,18 @@ function initMap() {
   });
 
   map.on("contextmenu", (event) => {
-    if (pendingRelocateMarkerId) return;
+    if (pendingRelocateMarkerId || pendingAddMarkerType) return;
     openStationMarkerDialog(event.latlng.lat, event.latlng.lng);
   });
 
   map.on("click", (event) => {
     if (pendingRelocateMarkerId) {
       relocateMapMarker(pendingRelocateMarkerId, event.latlng);
+      return;
+    }
+    if (pendingAddMarkerType) {
+      addMapMarkerAt(pendingAddMarkerType, event.latlng);
+      setAddMarkerMode(null);
       return;
     }
     hideStationContextMenu();
@@ -525,6 +531,27 @@ function relocateMapMarker(id, latlng) {
   pendingRelocateMarkerId = null;
   clearRelocateBanner();
   saveData(`Map marker relocated: ${marker.name}`);
+}
+
+function setAddMarkerMode(type) {
+  pendingAddMarkerType = type;
+  document.getElementById("addEventOnMap")?.classList.toggle("active", type === "incident");
+}
+
+function addMapMarkerAt(type, latlng) {
+  const timeLabel = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const marker = {
+    id: crypto.randomUUID(),
+    type,
+    name: `${type === "incident" ? "EVENT" : type.toUpperCase()} ${timeLabel}`,
+    lat: Number(latlng.lat),
+    lng: Number(latlng.lng),
+    status: defaultMarkerStatus(type),
+    color: markerColor(type),
+    note: "Added by map click"
+  };
+  data.markers.push(marker);
+  saveData(`Map ${type} added: ${marker.name}`);
 }
 
 function render() {
@@ -975,6 +1002,10 @@ function bindActions() {
     const row = event.target.closest("[data-message-id]");
     if (!row) return;
     focusMessageStation(row.dataset.messageId);
+  });
+
+  document.getElementById("addEventOnMap").addEventListener("click", () => {
+    setAddMarkerMode(pendingAddMarkerType === "incident" ? null : "incident");
   });
 
   document.getElementById("openSettings").addEventListener("click", () => document.getElementById("editSettings").click());

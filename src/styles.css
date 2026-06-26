@@ -284,6 +284,13 @@ dialog input[type="color"] {
   font-weight: 700;
 }
 
+#addEventOnMap.active {
+  background: var(--red);
+  color: var(--text);
+  border-color: var(--red);
+  font-weight: 800;
+}
+
 .map-hint {
   display: inline-flex;
   align-items: center;
