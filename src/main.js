@@ -89,6 +89,7 @@ function createIaruMessageRecord(item, settings, activeFrequency) {
   const timeFiled = item.timeFiled || new Date().toISOString();
   const text = String(item.text || item.subject || "").trim();
   const from = String(item.from || item.stationOrigin || settings.callsign || "").trim().toUpperCase();
+  const sentAt = item.sentAt || (trafficHasBeenSent(item.status) ? timeFiled : "");
   return {
     handling: item.priority || "Routine",
     method: item.method || "Voice",
@@ -103,7 +104,9 @@ function createIaruMessageRecord(item, settings, activeFrequency) {
     wordCount: Math.max(0, Number(item.wordCount) || countMessageWords(text)),
     from,
     to: String(item.to || "").trim().toUpperCase(),
-    subject: item.subject || messageSummary(text)
+    subject: item.subject || messageSummary(text),
+    receivedAt: item.receivedAt || timeFiled,
+    sentAt
   };
 }
 
@@ -334,6 +337,8 @@ function iaruMessageHtml(message) {
   const operatorCallsign = String(data.settings.callsign || message.operator || "").trim().toUpperCase();
   const receivedDate = formatFilingDate(message.receivedAt || message.timeFiled);
   const receivedTime = formatFilingTime(message.receivedAt || message.timeFiled);
+  const sentDate = message.sentAt ? formatFilingDate(message.sentAt) : "";
+  const sentTime = message.sentAt ? formatFilingTime(message.sentAt) : "";
   const sentAddress = formatTrafficAddress(message.to);
   const iaruLogoUrl = assetUrl("iaru-logo.png");
   const messageLines = Array.from({ length: 4 }, (_, index) => {
@@ -401,8 +406,8 @@ function iaruMessageHtml(message) {
           </tr>
           <tr>
             <td>${escapeHtml(sentAddress)}</td>
-            <td></td>
-            <td></td>
+            <td>${escapeHtml(sentDate)}</td>
+            <td>${escapeHtml(sentTime)}</td>
           </tr>
         </table>
       </div>
@@ -448,13 +453,21 @@ function formatTrafficAddress(value) {
   const tacticalCall = String(data.settings.tacticalCall || "").trim().toUpperCase();
   const netControlNames = new Set(["NET CONTROL", "NCS", tacticalCall].filter(Boolean));
   if (netControlNames.has(rawValue)) {
-    return [data.settings.callsign, data.settings.tacticalCall]
-      .filter(Boolean)
-      .join(" ")
-      .trim()
-      .toUpperCase();
+    return netControlIdentity();
   }
   return rawValue;
+}
+
+function netControlIdentity() {
+  return [data.settings.callsign, data.settings.tacticalCall]
+    .filter(Boolean)
+    .join(" ")
+    .trim()
+    .toUpperCase();
+}
+
+function trafficHasBeenSent(status) {
+  return ["Sent", "Acknowledged", "Delivered"].includes(String(status || ""));
 }
 
 function openMessageDetail(messageId) {
@@ -462,9 +475,40 @@ function openMessageDetail(messageId) {
   if (!message) return;
   const dialog = document.getElementById("messageDialog");
   document.getElementById("messageDialogTitle").textContent = `${message.number} IARU Message`;
-  document.getElementById("messageDialogBody").innerHTML = iaruMessageHtml(message);
+  document.getElementById("messageDialogBody").innerHTML = `${messageTrafficSummary(message)}${iaruMessageHtml(message)}`;
   document.getElementById("printMessageDialog").dataset.messageId = messageId;
   dialog.showModal();
+}
+
+function messageTrafficSummary(message) {
+  return `
+    <div class="traffic-context">
+      <article>
+        <span>Net Control</span>
+        <strong>${escapeHtml(netControlIdentity())}</strong>
+      </article>
+      <article>
+        <span>Origin Station</span>
+        <strong>${escapeHtml(message.stationOrigin || message.from)}</strong>
+      </article>
+      <article>
+        <span>Addressee</span>
+        <strong>${escapeHtml(formatTrafficAddress(message.to))}</strong>
+      </article>
+      <article>
+        <span>Signature</span>
+        <strong>${escapeHtml(message.from)}</strong>
+      </article>
+      <article>
+        <span>Frequency</span>
+        <strong>${escapeHtml(message.frequency || activeFrequencyLabel())}</strong>
+      </article>
+      <article>
+        <span>Status</span>
+        <strong>${escapeHtml(message.status)}</strong>
+      </article>
+    </div>
+  `;
 }
 
 function printIaruMessage(messageId) {
@@ -835,6 +879,24 @@ function renderFrequencies() {
 }
 
 function renderMessages() {
+  document.getElementById("messageWorkflowSummary").innerHTML = `
+    <article>
+      <span>Net Control</span>
+      <strong>${escapeHtml(netControlIdentity())}</strong>
+    </article>
+    <article>
+      <span>Operator</span>
+      <strong>${escapeHtml(data.settings.operatorName)}</strong>
+    </article>
+    <article>
+      <span>Active Frequency</span>
+      <strong>${escapeHtml(activeFrequencyLabel())}</strong>
+    </article>
+    <article>
+      <span>Next Message</span>
+      <strong>${escapeHtml(nextMessageNumber())}</strong>
+    </article>
+  `;
   document.getElementById("messageTable").innerHTML = data.messages.length ? data.messages.map((item) => `
     <tr class="message-row ${findMarkerForMessage(item) ? "has-map-target" : ""}" data-message-id="${escapeHtml(item.id)}">
       <td>${escapeHtml(item.number)}</td>
@@ -844,13 +906,14 @@ function renderMessages() {
       <td>${escapeHtml(item.stationOrigin || item.from)}</td>
       <td>${escapeHtml(item.wordCount || countMessageWords(item.text))}</td>
       <td>${escapeHtml(item.frequency || activeFrequencyLabel())}</td>
-      <td>${escapeHtml(item.to)}</td>
+      <td>${escapeHtml(formatTrafficAddress(item.to))}</td>
       <td>${escapeHtml(item.from)}</td>
       <td>${escapeHtml(messageSummary(item.text || item.subject))}</td>
       <td>${escapeHtml(item.status)}</td>
       <td>
         <div class="table-actions">
           <button data-action="edit-message" data-id="${item.id}">Edit</button>
+          <button data-action="open-message" data-id="${item.id}">IARU</button>
           <button data-action="advance-message" data-id="${item.id}">Next</button>
           <button data-action="cancel-message" data-id="${item.id}">Cancel</button>
           <button data-delete="message" data-id="${item.id}">Trash</button>
@@ -927,14 +990,15 @@ function fieldsToHtml(fields) {
   return fields.map((field) => {
     const value = field.value == null ? "" : String(field.value);
     const required = field.required === false ? "" : "required";
+    const help = field.help ? `<span class="field-help">${escapeHtml(field.help)}</span>` : "";
     if (field.type === "select") {
-      return `<label>${field.label}<select name="${field.name}" ${required}>${field.options.map((option) => `<option ${option === value ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select></label>`;
+      return `<label>${field.label}${help}<select name="${field.name}" ${required}>${field.options.map((option) => `<option ${option === value ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select></label>`;
     }
     if (field.type === "textarea") {
-      return `<label>${field.label}<textarea name="${field.name}" ${required}>${escapeHtml(value)}</textarea></label>`;
+      return `<label>${field.label}${help}<textarea name="${field.name}" ${required}>${escapeHtml(value)}</textarea></label>`;
     }
     const step = field.type === "number" ? `step="${field.step || "any"}"` : "";
-    return `<label>${field.label}<input name="${field.name}" type="${field.type || "text"}" value="${escapeAttribute(value)}" ${step} ${required}></label>`;
+    return `<label>${field.label}${help}<input name="${field.name}" type="${field.type || "text"}" value="${escapeAttribute(value)}" ${step} ${required}></label>`;
   }).join("");
 }
 
@@ -1012,17 +1076,17 @@ function messageFields(item = {}) {
     : selectedFrom;
   const filingSource = item.timeFiled || new Date();
   return [
-    { label: "Message number", name: "number", value: item.number || nextMessageNumber() },
-    { label: "Precedence", name: "priority", type: "select", value: item.priority || "Routine", options: ["Routine", "Priority", "Emergency", "Welfare"] },
-    { label: "Station of origin", name: "stationOrigin", type: "select", value: selectedOrigin, options: stationOptions },
-    { label: "Word count (check)", name: "wordCount", type: "number", value: item.wordCount || countMessageWords(item.text || item.subject || "") },
-    { label: "Place of origin", name: "placeOrigin", value: item.placeOrigin || data.settings.location },
-    { label: "Filing time", name: "filingTime", type: "time", value: item.filingTime || formatFilingTime(filingSource) },
-    { label: "Filing date", name: "filingDate", type: "date", value: item.filingDate || formatFilingDate(filingSource) },
-    { label: "Frequency", name: "frequency", type: "select", value: item.frequency || activeFrequencyLabel(), options: frequencyOptions() },
-    { label: "To (block letters)", name: "to", value: item.to },
-    { label: "Message text", name: "text", type: "textarea", value: item.text || item.subject || "" },
-    { label: "From (block letters)", name: "from", type: "select", value: selectedFrom, options: stationOptions },
+    { label: "Message number", name: "number", value: item.number || nextMessageNumber(), help: "Unique local traffic number printed in the IARU NUMBER box." },
+    { label: "Precedence", name: "priority", type: "select", value: item.priority || "Routine", options: ["Routine", "Priority", "Emergency"], help: "Use Emergency only for immediate life or safety traffic." },
+    { label: "Origin station callsign", name: "stationOrigin", type: "select", value: selectedOrigin, options: stationOptions, help: "Radio station where this formal message entered the net." },
+    { label: "Word count check", name: "wordCount", type: "number", value: item.wordCount || countMessageWords(item.text || item.subject || ""), help: "Auto-counted from message text; used to verify copied traffic." },
+    { label: "Place of origin", name: "placeOrigin", value: item.placeOrigin || data.settings.location, help: "Location where the message was filed." },
+    { label: "Filing time", name: "filingTime", type: "time", value: item.filingTime || formatFilingTime(filingSource), help: "Local time the message was filed." },
+    { label: "Filing date", name: "filingDate", type: "date", value: item.filingDate || formatFilingDate(filingSource), help: "Local date the message was filed." },
+    { label: "Traffic frequency", name: "frequency", type: "select", value: item.frequency || activeFrequencyLabel(), options: frequencyOptions(), help: "Frequency used to pass or log this message." },
+    { label: "Addressee / To", name: "to", value: item.to || netControlIdentity(), help: "Recipient written in block letters. NET CONTROL resolves to the current station identity." },
+    { label: "Message text", name: "text", type: "textarea", value: item.text || item.subject || "", help: "Formal message body only. Keep it plain and easy to copy." },
+    { label: "Signature / From", name: "from", type: "select", value: selectedFrom, options: stationOptions, help: "Station or person responsible for the message content." },
     { label: "Status", name: "status", type: "select", value: item.status || "Drafted", options: ["Drafted", "Sent", "Acknowledged", "Delivered", "Canceled"] },
   ];
 }
@@ -1043,10 +1107,13 @@ function frequencyOptions() {
 }
 
 function stationCallsignOptions() {
-  return [...new Set(data.markers
-    .filter((item) => item.type === "station")
-    .map((item) => markerCallsign(item))
-    .filter(Boolean))].sort();
+  return [...new Set([
+    data.settings.callsign,
+    ...data.checkins.map((item) => item.callsign),
+    ...data.markers
+      .filter((item) => item.type === "station")
+      .map((item) => markerCallsign(item))
+  ].map((value) => String(value || "").trim().toUpperCase()).filter(Boolean))].sort();
 }
 
 function markerCallsign(marker) {
@@ -1132,6 +1199,8 @@ function normalizeMessage(entry, existing = {}) {
   const filedAt = existing.timeFiled || new Date().toISOString();
   const filingDate = entry.filingDate || formatFilingDate(filedAt);
   const filingTime = entry.filingTime || formatFilingTime(filedAt);
+  const status = entry.status || existing.status || "Drafted";
+  const sentAt = trafficHasBeenSent(status) ? existing.sentAt || new Date().toISOString() : "";
   return {
     ...existing,
     ...entry,
@@ -1147,6 +1216,9 @@ function normalizeMessage(entry, existing = {}) {
     frequency: String(entry.frequency || activeFrequencyLabel()).trim(),
     text: text.toUpperCase(),
     timeFiled: filedAt,
+    receivedAt: existing.receivedAt || filedAt,
+    sentAt,
+    status,
     operator: data.settings.callsign
   };
 }
@@ -1446,12 +1518,19 @@ function handleAction(action, id) {
     return;
   }
 
+  if (action === "open-message") {
+    focusMessageStation(id);
+    openMessageDetail(id);
+    return;
+  }
+
   if (action === "advance-message") {
     const item = data.messages.find((message) => message.id === id);
     if (!item) return;
     const flow = ["Drafted", "Sent", "Acknowledged", "Delivered"];
     const next = flow[Math.min(flow.indexOf(item.status) + 1, flow.length - 1)] || "Sent";
     item.status = next;
+    if (trafficHasBeenSent(next) && !item.sentAt) item.sentAt = new Date().toISOString();
     saveData(`Message ${item.number} marked ${next}`);
     return;
   }
@@ -1460,6 +1539,7 @@ function handleAction(action, id) {
     const item = data.messages.find((message) => message.id === id);
     if (!item) return;
     item.status = item.status === "Canceled" ? "Drafted" : "Canceled";
+    item.sentAt = "";
     saveData(`Message ${item.number} marked ${item.status}`);
     return;
   }

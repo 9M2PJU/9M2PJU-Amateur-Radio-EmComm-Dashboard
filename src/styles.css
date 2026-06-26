@@ -716,9 +716,15 @@ dialog::backdrop {
 
 #dialogFields label {
   display: grid;
-  gap: 6px;
+  gap: 5px;
   color: var(--muted);
   font-size: 0.84rem;
+}
+
+.field-help {
+  color: #c6d7d4;
+  font-size: 0.72rem;
+  line-height: 1.25;
 }
 
 dialog textarea {
@@ -745,6 +751,36 @@ dialog menu {
 .message-dialog form {
   display: grid;
   gap: 12px;
+}
+
+.traffic-context {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.traffic-context article {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #101820;
+}
+
+.traffic-context span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.traffic-context strong {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 0.86rem;
 }
 
 #messageDialogBody {
