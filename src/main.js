@@ -936,6 +936,16 @@ function nextMessageNumber() {
   return `${data.settings.messagePrefix}-${String(data.settings.nextMessageNumber).padStart(3, "0")}`;
 }
 
+function syncMessageNumberCounter() {
+  const prefix = String(data.settings.messagePrefix || "MSG").toUpperCase();
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const highest = data.messages.reduce((max, message) => {
+    const match = String(message.number || "").toUpperCase().match(new RegExp(`^${escapedPrefix}-(\\d+)$`));
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+  data.settings.nextMessageNumber = highest + 1;
+}
+
 function normalizeMessage(entry, existing = {}) {
   const cleanFrom = String(entry.from || stationCallsignOptions()[0] || "").trim().toUpperCase();
   const text = String(entry.text || "").trim();
@@ -1002,11 +1012,14 @@ function bindActions() {
     saveData(`Frequency added: ${entry.frequency}`);
   }));
 
-  document.getElementById("addMessage").addEventListener("click", () => openEntry("New Message", messageFields(), (entry) => {
-    data.messages.unshift({ id: crypto.randomUUID(), ...normalizeMessage(entry) });
-    data.settings.nextMessageNumber = Number(data.settings.nextMessageNumber) + 1;
-    saveData(`Message logged: ${entry.number}`);
-  }));
+  document.getElementById("addMessage").addEventListener("click", () => {
+    syncMessageNumberCounter();
+    openEntry("New Message", messageFields(), (entry) => {
+      data.messages.unshift({ id: crypto.randomUUID(), ...normalizeMessage(entry) });
+      syncMessageNumberCounter();
+      saveData(`Message logged: ${entry.number}`);
+    });
+  });
 
   document.getElementById("messageTable").addEventListener("click", (event) => {
     if (event.target.closest("button")) return;
@@ -1106,6 +1119,7 @@ function bindActions() {
       const item = data.messages.find((message) => message.id === deleteButton.dataset.id);
       if (!item || !confirm(`Trash message ${item.number}?`)) return;
       data.messages = data.messages.filter((message) => message.id !== item.id);
+      syncMessageNumberCounter();
       saveData(`Message trashed: ${item.number}`);
       return;
     }
