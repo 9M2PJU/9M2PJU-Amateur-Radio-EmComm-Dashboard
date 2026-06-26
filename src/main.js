@@ -276,6 +276,8 @@ function showStationContextMenu(station, latlng) {
   menu.innerHTML = `
     <strong>${escapeHtml(station.name)}</strong>
     <button data-action="start-relocate-station" data-id="${escapeHtml(station.id)}">Relocate</button>
+    <button data-action="edit-map-station" data-id="${escapeHtml(station.id)}">Edit</button>
+    <button data-delete="map-station" data-id="${escapeHtml(station.id)}">Trash</button>
     <button data-action="close-station-menu">Cancel</button>
   `;
   document.querySelector(".map-panel").appendChild(menu);
@@ -399,6 +401,7 @@ function renderMessages() {
           <button data-action="edit-message" data-id="${item.id}">Edit</button>
           <button data-action="advance-message" data-id="${item.id}">Next</button>
           <button data-action="cancel-message" data-id="${item.id}">Cancel</button>
+          <button data-delete="message" data-id="${item.id}">Trash</button>
         </div>
       </td>
     </tr>
@@ -416,6 +419,10 @@ function renderTasks() {
             <strong>${escapeHtml(task.title)}</strong>
             <span class="badge ${task.priority.toLowerCase()}">${escapeHtml(task.priority)}</span>
             <span class="meta">${escapeHtml(task.assignee)} · ${escapeHtml(task.location)}</span>
+            <div class="card-actions">
+              <button data-action="edit-task" data-id="${task.id}">Edit</button>
+              <button data-delete="task" data-id="${task.id}">Trash</button>
+            </div>
           </article>
         `).join("")}
       </div>
@@ -429,6 +436,10 @@ function renderStations() {
       <strong>${escapeHtml(item.callsign)}</strong>
       <span class="badge ${item.status}">${escapeHtml(item.status)}</span>
       <span class="meta">${escapeHtml(item.role)} · Last heard ${escapeHtml(item.lastHeard)}</span>
+      <div class="card-actions">
+        <button data-action="edit-station" data-id="${item.id}">Edit</button>
+        <button data-delete="station" data-id="${item.id}">Trash</button>
+      </div>
     </article>
   `).join("");
 }
@@ -440,6 +451,10 @@ function renderReadiness() {
       <span class="badge ${item.status.toLowerCase()}">${escapeHtml(item.status)}</span>
       <span class="meta">${escapeHtml(item.note)}</span>
       <div class="readiness-meter"><span style="width:${Number(item.level) || 0}%"></span></div>
+      <div class="card-actions">
+        <button data-action="edit-readiness" data-id="${item.id}">Edit</button>
+        <button data-delete="readiness" data-id="${item.id}">Trash</button>
+      </div>
     </article>
   `).join("");
 }
@@ -521,6 +536,34 @@ function frequencyFields(item = {}) {
     { label: "Mode", name: "mode", value: item.mode },
     { label: "Purpose", name: "purpose", value: item.purpose },
     { label: "Status", name: "status", type: "select", value: item.status || "Standby", options: ["Active", "Standby", "Canceled"] }
+  ];
+}
+
+function stationCheckinFields(item = {}) {
+  return [
+    { label: "Callsign", name: "callsign", value: item.callsign },
+    { label: "Role", name: "role", value: item.role },
+    { label: "Status", name: "status", type: "select", value: item.status || "available", options: ["available", "assigned", "mobile", "offline"] },
+    { label: "Last heard", name: "lastHeard", value: item.lastHeard || "Now" }
+  ];
+}
+
+function taskFields(item = {}) {
+  return [
+    { label: "Task", name: "title", value: item.title },
+    { label: "Assignee", name: "assignee", value: item.assignee },
+    { label: "Priority", name: "priority", type: "select", value: item.priority || "Routine", options: ["Routine", "Priority", "Emergency"] },
+    { label: "Status", name: "status", type: "select", value: item.status || "Assigned", options: ["Assigned", "In Progress", "Waiting", "Done"] },
+    { label: "Location", name: "location", value: item.location }
+  ];
+}
+
+function readinessFields(item = {}) {
+  return [
+    { label: "Item", name: "item", value: item.item },
+    { label: "Status", name: "status", type: "select", value: item.status || "Ready", options: ["Ready", "Degraded", "Unavailable"] },
+    { label: "Level 0-100", name: "level", type: "number", value: item.level ?? 100 },
+    { label: "Note", name: "note", type: "textarea", value: item.note }
   ];
 }
 
@@ -631,6 +674,34 @@ function normalizeMessage(entry, existing = {}) {
   };
 }
 
+function normalizeStationCheckin(entry) {
+  return {
+    callsign: entry.callsign.trim().toUpperCase(),
+    role: entry.role.trim(),
+    status: entry.status,
+    lastHeard: entry.lastHeard.trim()
+  };
+}
+
+function normalizeTask(entry) {
+  return {
+    title: entry.title.trim(),
+    assignee: entry.assignee.trim(),
+    priority: entry.priority,
+    status: entry.status,
+    location: entry.location.trim()
+  };
+}
+
+function normalizeReadiness(entry) {
+  return {
+    item: entry.item.trim(),
+    status: entry.status,
+    level: Math.max(0, Math.min(100, Number(entry.level) || 0)),
+    note: entry.note.trim()
+  };
+}
+
 function bindActions() {
   document.getElementById("markerForm").addEventListener("submit", (event) => {
     event.preventDefault();
@@ -649,14 +720,11 @@ function bindActions() {
     saveData(`Map marker added: ${marker.name}`);
   });
 
-  document.getElementById("addCheckin").addEventListener("click", () => openEntry("Station Check In", [
-    { label: "Callsign", name: "callsign" },
-    { label: "Role", name: "role" },
-    { label: "Status", name: "status", type: "select", options: ["available", "assigned", "mobile", "offline"] },
-    { label: "Last heard", name: "lastHeard" }
-  ], (entry) => {
-    data.checkins.push({ id: crypto.randomUUID(), ...entry });
-    saveData(`Station checked in: ${entry.callsign}`);
+  document.getElementById("addCheckin").addEventListener("click", () => openEntry("Station Check In", stationCheckinFields(), (entry) => {
+    const station = normalizeStationCheckin(entry);
+    if (!station.callsign) return;
+    data.checkins.push({ id: crypto.randomUUID(), ...station });
+    saveData(`Station checked in: ${station.callsign}`);
   }));
 
   document.getElementById("addFrequency").addEventListener("click", () => openEntry("Add Frequency", frequencyFields(), (entry) => {
@@ -691,27 +759,20 @@ function bindActions() {
     saveData(`Settings updated for ${data.settings.callsign}`);
   }));
 
-  document.getElementById("addTask").addEventListener("click", () => openEntry("Add Task", [
-    { label: "Task", name: "title" },
-    { label: "Assignee", name: "assignee" },
-    { label: "Priority", name: "priority", type: "select", options: ["Routine", "Priority", "Emergency"] },
-    { label: "Status", name: "status", type: "select", options: ["Assigned", "In Progress", "Waiting", "Done"] },
-    { label: "Location", name: "location" }
-  ], (entry) => {
-    data.tasks.unshift({ id: crypto.randomUUID(), ...entry });
-    saveData(`Task added: ${entry.title}`);
+  document.getElementById("addTask").addEventListener("click", () => openEntry("Add Task", taskFields(), (entry) => {
+    const task = normalizeTask(entry);
+    if (!task.title) return;
+    data.tasks.unshift({ id: crypto.randomUUID(), ...task });
+    saveData(`Task added: ${task.title}`);
   }));
 
   document.getElementById("addStation").addEventListener("click", () => document.getElementById("addCheckin").click());
 
-  document.getElementById("addReadiness").addEventListener("click", () => openEntry("Add Readiness Item", [
-    { label: "Item", name: "item" },
-    { label: "Status", name: "status", type: "select", options: ["Ready", "Degraded", "Unavailable"] },
-    { label: "Level 0-100", name: "level", type: "number" },
-    { label: "Note", name: "note", type: "textarea" }
-  ], (entry) => {
-    data.readiness.push({ id: crypto.randomUUID(), ...entry, level: Math.max(0, Math.min(100, Number(entry.level))) });
-    saveData(`Readiness updated: ${entry.item}`);
+  document.getElementById("addReadiness").addEventListener("click", () => openEntry("Add Readiness Item", readinessFields(), (entry) => {
+    const readiness = normalizeReadiness(entry);
+    if (!readiness.item) return;
+    data.readiness.push({ id: crypto.randomUUID(), ...readiness });
+    saveData(`Readiness updated: ${readiness.item}`);
   }));
 
   document.getElementById("clearLog").addEventListener("click", () => {
@@ -750,6 +811,42 @@ function bindActions() {
       if (!confirm("Delete this frequency from this device?")) return;
       data.frequencies = data.frequencies.filter((item) => item.id !== deleteButton.dataset.id);
       saveData("Frequency removed.");
+      return;
+    }
+    if (deleteButton.dataset.delete === "message") {
+      const item = data.messages.find((message) => message.id === deleteButton.dataset.id);
+      if (!item || !confirm(`Trash message ${item.number}?`)) return;
+      data.messages = data.messages.filter((message) => message.id !== item.id);
+      saveData(`Message trashed: ${item.number}`);
+      return;
+    }
+    if (deleteButton.dataset.delete === "task") {
+      const item = data.tasks.find((task) => task.id === deleteButton.dataset.id);
+      if (!item || !confirm(`Trash task "${item.title}"?`)) return;
+      data.tasks = data.tasks.filter((task) => task.id !== item.id);
+      saveData(`Task trashed: ${item.title}`);
+      return;
+    }
+    if (deleteButton.dataset.delete === "station") {
+      const item = data.checkins.find((station) => station.id === deleteButton.dataset.id);
+      if (!item || !confirm(`Trash station ${item.callsign}?`)) return;
+      data.checkins = data.checkins.filter((station) => station.id !== item.id);
+      saveData(`Station trashed: ${item.callsign}`);
+      return;
+    }
+    if (deleteButton.dataset.delete === "map-station") {
+      const item = data.markers.find((marker) => marker.id === deleteButton.dataset.id && marker.type === "station");
+      if (!item || !confirm(`Trash map station ${item.name}?`)) return;
+      hideStationContextMenu();
+      data.markers = data.markers.filter((marker) => marker.id !== item.id);
+      saveData(`Map station trashed: ${item.name}`);
+      return;
+    }
+    if (deleteButton.dataset.delete === "readiness") {
+      const item = data.readiness.find((readiness) => readiness.id === deleteButton.dataset.id);
+      if (!item || !confirm(`Trash readiness item "${item.item}"?`)) return;
+      data.readiness = data.readiness.filter((readiness) => readiness.id !== item.id);
+      saveData(`Readiness item trashed: ${item.item}`);
     }
   });
 
@@ -792,6 +889,28 @@ function handleAction(action, id) {
 
   if (action === "close-station-menu") {
     hideStationContextMenu();
+    return;
+  }
+
+  if (action === "edit-map-station") {
+    const item = data.markers.find((marker) => marker.id === id && marker.type === "station");
+    if (!item) return;
+    hideStationContextMenu();
+    openEntry("Edit Map Station", stationMarkerFields(item.lat, item.lng).map((field) => ({
+      ...field,
+      value: item[field.name] ?? field.value
+    })), (entry) => {
+      const marker = {
+        name: entry.name.trim().toUpperCase(),
+        status: entry.status,
+        lat: Number(entry.lat),
+        lng: Number(entry.lng),
+        note: entry.note.trim()
+      };
+      if (!marker.name || !Number.isFinite(marker.lat) || !Number.isFinite(marker.lng)) return;
+      Object.assign(item, marker);
+      saveData(`Map station updated: ${marker.name}`);
+    }, "Save Station");
     return;
   }
 
@@ -848,6 +967,42 @@ function handleAction(action, id) {
     if (!item) return;
     item.status = item.status === "Canceled" ? "Drafted" : "Canceled";
     saveData(`Message ${item.number} marked ${item.status}`);
+    return;
+  }
+
+  if (action === "edit-task") {
+    const item = data.tasks.find((task) => task.id === id);
+    if (!item) return;
+    openEntry("Edit Task", taskFields(item), (entry) => {
+      const task = normalizeTask(entry);
+      if (!task.title) return;
+      Object.assign(item, task);
+      saveData(`Task updated: ${task.title}`);
+    });
+    return;
+  }
+
+  if (action === "edit-station") {
+    const item = data.checkins.find((station) => station.id === id);
+    if (!item) return;
+    openEntry("Edit Station", stationCheckinFields(item), (entry) => {
+      const station = normalizeStationCheckin(entry);
+      if (!station.callsign) return;
+      Object.assign(item, station);
+      saveData(`Station updated: ${station.callsign}`);
+    });
+    return;
+  }
+
+  if (action === "edit-readiness") {
+    const item = data.readiness.find((readiness) => readiness.id === id);
+    if (!item) return;
+    openEntry("Edit Readiness Item", readinessFields(item), (entry) => {
+      const readiness = normalizeReadiness(entry);
+      if (!readiness.item) return;
+      Object.assign(item, readiness);
+      saveData(`Readiness updated: ${readiness.item}`);
+    });
   }
 }
 

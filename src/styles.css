@@ -456,6 +456,10 @@ dialog textarea {
   gap: 6px;
 }
 
+.card-actions {
+  margin-top: 10px;
+}
+
 .card-actions button,
 .table-actions button {
   min-height: 32px;
