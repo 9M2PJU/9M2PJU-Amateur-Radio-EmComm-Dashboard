@@ -962,23 +962,6 @@ function normalizeReadiness(entry) {
 }
 
 function bindActions() {
-  document.getElementById("markerForm").addEventListener("submit", (event) => {
-    event.preventDefault();
-    const marker = {
-      id: crypto.randomUUID(),
-      type: document.getElementById("markerType").value,
-      name: document.getElementById("markerName").value,
-      lat: Number(document.getElementById("markerLat").value),
-      lng: Number(document.getElementById("markerLng").value),
-      status: "new",
-      note: "Added by operator"
-    };
-    if (!Number.isFinite(marker.lat) || !Number.isFinite(marker.lng)) return;
-    data.markers.push(marker);
-    event.target.reset();
-    saveData(`Map marker added: ${marker.name}`);
-  });
-
   document.getElementById("addCheckin").addEventListener("click", () => openEntry("Station Check In", stationCheckinFields(), (entry) => {
     const station = normalizeStationCheckin(entry);
     if (!station.callsign) return;

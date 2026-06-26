@@ -199,7 +199,6 @@ h2 {
 }
 
 .map-toolbar,
-.quick-add,
 .map-summary {
   position: absolute;
   z-index: 500;
@@ -242,16 +241,6 @@ h2 {
   font-size: 0.76rem;
 }
 
-.quick-add {
-  bottom: 12px;
-  padding: 10px;
-  border: 1px solid rgba(238, 246, 244, 0.18);
-  border-radius: 8px;
-  background: rgba(15, 23, 29, 0.9);
-}
-
-.quick-add input,
-.quick-add select,
 dialog input,
 dialog select,
 dialog textarea {
@@ -266,11 +255,6 @@ dialog textarea {
 dialog input[type="color"] {
   width: 100%;
   padding: 4px;
-}
-
-.quick-add input {
-  min-width: 120px;
-  flex: 1;
 }
 
 .layer-toggle {
@@ -815,11 +799,6 @@ dialog menu {
   .kanban,
   #dialogFields {
     grid-template-columns: 1fr;
-  }
-
-  .quick-add {
-    position: static;
-    border-radius: 0;
   }
 
   .map-summary {
