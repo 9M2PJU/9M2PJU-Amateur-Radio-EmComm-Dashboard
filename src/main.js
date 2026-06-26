@@ -326,6 +326,109 @@ function printOperationalLog() {
   printWindow.print();
 }
 
+function iaruMessageHtml(message) {
+  const precedence = ["Routine", "Priority", "Emergency"];
+  const currentPrecedence = String(message.priority || "Routine");
+  const text = String(message.text || message.subject || "").trim();
+  const wordCount = message.wordCount || countMessageWords(text);
+  return `
+    <section class="iaru-form" aria-label="IARU message form">
+      <div class="iaru-title-row">
+        <div></div>
+        <h1>MESSAGE</h1>
+        <div class="iaru-mark">IARU</div>
+      </div>
+      <table class="iaru-header-table">
+        <tr>
+          <th>NUMBER</th>
+          <th>PRECEDENCE<br><span>(tick one)</span></th>
+          <th>STATION OF<br>ORIGIN</th>
+          <th>WORD COUNT<br>(CHECK)</th>
+          <th>PLACE OF ORIGIN</th>
+          <th>FILING TIME</th>
+          <th>FILING DATE</th>
+        </tr>
+        <tr>
+          <td>${escapeHtml(message.number)}</td>
+          <td>
+            ${precedence.map((item) => `<div class="iaru-check">${item === currentPrecedence ? "[x]" : "[ ]"} ${escapeHtml(item)}</div>`).join("")}
+          </td>
+          <td>${escapeHtml(message.stationOrigin || message.from)}</td>
+          <td>${escapeHtml(wordCount)}</td>
+          <td>${escapeHtml(message.placeOrigin || data.settings.location)}</td>
+          <td>${escapeHtml(message.filingTime || formatFilingTime(message.timeFiled))}</td>
+          <td>${escapeHtml(message.filingDate || formatFilingDate(message.timeFiled))}</td>
+        </tr>
+      </table>
+      <div class="iaru-line-field">
+        <strong>To:</strong> <span>(BLOCK LETTERS)</span>
+        <div>${escapeHtml(message.to)}</div>
+      </div>
+      <div class="iaru-message-text">${escapeHtml(text)}</div>
+      <div class="iaru-line-field">
+        <strong>From:</strong> <span>(BLOCK LETTERS)</span>
+        <div>${escapeHtml(message.from)}</div>
+      </div>
+      <div class="iaru-footer">
+        <span>Frequency: ${escapeHtml(message.frequency || activeFrequencyLabel())}</span>
+        <span>Status: ${escapeHtml(message.status)}</span>
+        <span>Operator: ${escapeHtml(message.operator || data.settings.callsign)}</span>
+      </div>
+    </section>
+  `;
+}
+
+function iaruPrintStyles() {
+  return `
+    body { margin: 0; padding: 18mm; color: #111; background: #fff; font-family: Arial, Helvetica, sans-serif; }
+    .iaru-form { max-width: 190mm; margin: 0 auto; }
+    .iaru-title-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; margin-bottom: 10px; }
+    .iaru-title-row h1 { margin: 0; font-size: 24px; font-weight: 500; letter-spacing: 0; text-align: center; }
+    .iaru-mark { justify-self: end; width: 48px; height: 58px; border: 2px solid #111; display: grid; place-items: center; font-size: 10px; font-weight: 700; transform: rotate(-30deg); }
+    .iaru-header-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+    .iaru-header-table th, .iaru-header-table td { border: 1px solid #111; padding: 5px; vertical-align: top; height: 46px; }
+    .iaru-header-table th { text-align: center; font-size: 11px; line-height: 1.1; }
+    .iaru-header-table th span { font-size: 9px; font-weight: 400; }
+    .iaru-check { white-space: nowrap; font-size: 10px; line-height: 1.35; }
+    .iaru-line-field { margin-top: 8px; font-size: 13px; }
+    .iaru-line-field span { font-size: 10px; }
+    .iaru-line-field div { min-height: 28px; border-bottom: 1px solid #111; padding: 7px 0 3px; font-size: 14px; letter-spacing: 0; }
+    .iaru-message-text { min-height: 130px; margin-top: 10px; padding: 10px 0; border-top: 1px solid #111; border-bottom: 3px double #111; white-space: pre-wrap; line-height: 2.05; font-size: 14px; }
+    .iaru-footer { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; color: #333; font-size: 10px; }
+    @page { size: A4; margin: 12mm; }
+  `;
+}
+
+function openMessageDetail(messageId) {
+  const message = data.messages.find((item) => item.id === messageId);
+  if (!message) return;
+  const dialog = document.getElementById("messageDialog");
+  document.getElementById("messageDialogTitle").textContent = `${message.number} IARU Message`;
+  document.getElementById("messageDialogBody").innerHTML = iaruMessageHtml(message);
+  document.getElementById("printMessageDialog").dataset.messageId = messageId;
+  dialog.showModal();
+}
+
+function printIaruMessage(messageId) {
+  const message = data.messages.find((item) => item.id === messageId);
+  if (!message) return;
+  const printWindow = window.open("", `iaru-message-${message.number}`);
+  if (!printWindow) return;
+  printWindow.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>${escapeHtml(message.number)} IARU Message</title>
+        <style>${iaruPrintStyles()}</style>
+      </head>
+      <body>${iaruMessageHtml(message)}</body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
 function validatedImport(rawData) {
   const imported = migrateData(rawData);
   if (!Array.isArray(imported.messages) || !Array.isArray(imported.log)) {
@@ -681,7 +784,7 @@ function renderMessages() {
         </div>
       </td>
     </tr>
-  `).join("") : `<tr><td colspan="10" class="empty-cell">No formal traffic logged.</td></tr>`;
+  `).join("") : `<tr><td colspan="12" class="empty-cell">No formal traffic logged.</td></tr>`;
 }
 
 function renderTasks() {
@@ -1030,6 +1133,15 @@ function bindActions() {
     const row = event.target.closest("[data-message-id]");
     if (!row) return;
     focusMessageStation(row.dataset.messageId);
+    openMessageDetail(row.dataset.messageId);
+  });
+
+  document.getElementById("closeMessageDialog").addEventListener("click", () => {
+    document.getElementById("messageDialog").close();
+  });
+
+  document.getElementById("printMessageDialog").addEventListener("click", (event) => {
+    printIaruMessage(event.currentTarget.dataset.messageId);
   });
 
   document.getElementById("addEventOnMap").addEventListener("click", () => {
