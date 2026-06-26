@@ -332,6 +332,9 @@ function iaruMessageHtml(message) {
   const text = String(message.text || message.subject || "").trim();
   const wordCount = message.wordCount || countMessageWords(text);
   const operatorCallsign = String(data.settings.callsign || message.operator || "").trim().toUpperCase();
+  const receivedDate = formatFilingDate(message.receivedAt || message.timeFiled);
+  const receivedTime = formatFilingTime(message.receivedAt || message.timeFiled);
+  const sentAddress = formatTrafficAddress(message.to);
   const iaruLogoUrl = assetUrl("iaru-logo.png");
   const messageLines = Array.from({ length: 4 }, (_, index) => {
     const line = text.split(/\n/)[index] || (index === 0 ? text : "");
@@ -340,14 +343,13 @@ function iaruMessageHtml(message) {
   return `
     <section class="iaru-form" aria-label="IARU message form">
       <div class="iaru-title-row">
-        <div></div>
         <h1>MESSAGE</h1>
         <img class="iaru-logo" src="${escapeHtml(iaruLogoUrl)}" alt="IARU logo">
       </div>
       <table class="iaru-header-table">
         <tr>
           <th>NUMBER</th>
-          <th>PRECEDENCE<br><span>(tick one)</span></th>
+          <th>PRECEDENCE</th>
           <th>STATION OF<br>ORIGIN</th>
           <th>WORD COUNT<br>(CHECK)</th>
           <th>PLACE OF ORIGIN</th>
@@ -368,7 +370,7 @@ function iaruMessageHtml(message) {
       </table>
       <div class="iaru-line-field">
         <span><strong>To:</strong> (BLOCK LETTERS):</span>
-        <div>${escapeHtml(message.to)}</div>
+        <div>${escapeHtml(sentAddress)}</div>
       </div>
       <div class="iaru-message-lines">${messageLines}</div>
       <div class="iaru-double-line"></div>
@@ -387,8 +389,8 @@ function iaruMessageHtml(message) {
           </tr>
           <tr>
             <td>${escapeHtml(operatorCallsign)}</td>
-            <td></td>
-            <td></td>
+            <td>${escapeHtml(receivedDate)}</td>
+            <td>${escapeHtml(receivedTime)}</td>
           </tr>
         </table>
         <table>
@@ -398,7 +400,7 @@ function iaruMessageHtml(message) {
             <th>TIME</th>
           </tr>
           <tr>
-            <td>${escapeHtml(message.to)}</td>
+            <td>${escapeHtml(sentAddress)}</td>
             <td></td>
             <td></td>
           </tr>
@@ -410,13 +412,13 @@ function iaruMessageHtml(message) {
 
 function iaruPrintStyles() {
   return `
-    body { margin: 0; padding: 10mm; color: #111; background: #fff; font-family: Arial, Helvetica, sans-serif; }
+    body { margin: 0; padding: 8mm 9mm; color: #111; background: #fff; font-family: Arial, Helvetica, sans-serif; }
     .iaru-form { max-width: 190mm; margin: 0 auto; }
-    .iaru-title-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; margin-bottom: 8px; }
-    .iaru-title-row h1 { margin: 0; font-size: 24px; font-weight: 500; letter-spacing: 0; text-align: center; }
-    .iaru-logo { justify-self: center; width: 48px; height: 64px; object-fit: contain; }
+    .iaru-title-row { position: relative; min-height: 62px; margin-bottom: 4px; }
+    .iaru-title-row h1 { margin: 0; padding-top: 4px; font-size: 25px; font-weight: 500; letter-spacing: 0; text-align: center; }
+    .iaru-logo { position: absolute; top: 0; right: 17mm; width: 42px; height: 58px; object-fit: contain; }
     .iaru-header-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
-    .iaru-header-table th, .iaru-header-table td { border: 1px solid #111; padding: 4px; vertical-align: top; height: 58px; }
+    .iaru-header-table th, .iaru-header-table td { border: 1px solid #111; padding: 4px; vertical-align: top; height: 54px; }
     .iaru-header-table th:nth-child(1) { width: 9%; }
     .iaru-header-table th:nth-child(2) { width: 16%; }
     .iaru-header-table th:nth-child(3) { width: 15%; }
@@ -424,22 +426,35 @@ function iaruPrintStyles() {
     .iaru-header-table th:nth-child(5) { width: 21%; }
     .iaru-header-table th:nth-child(6) { width: 12%; }
     .iaru-header-table th:nth-child(7) { width: 13%; }
-    .iaru-header-table th { text-align: center; font-size: 11px; line-height: 1.1; }
-    .iaru-header-table th span { font-size: 9px; font-weight: 400; }
+    .iaru-header-table th { color: #5f7378; text-align: center; font-size: 11px; line-height: 1.08; }
     .iaru-check { white-space: nowrap; font-size: 10px; line-height: 1.35; }
     .iaru-line-field { margin-top: 6px; font-size: 13px; }
     .iaru-line-field span { font-size: 10px; }
     .iaru-line-field div { min-height: 24px; border-bottom: 1px solid #111; padding: 6px 0 3px; font-size: 14px; letter-spacing: 0; }
     .iaru-message-lines { margin-top: 4px; }
-    .iaru-message-lines div { min-height: 40px; border-bottom: 1px solid #111; padding: 8px 0 3px; font-size: 14px; }
-    .iaru-double-line { height: 5px; margin-top: 2px; border-top: 1px solid #111; border-bottom: 1px solid #111; }
+    .iaru-message-lines div { min-height: 34px; border-bottom: 1px solid #111; padding: 8px 0 3px; font-size: 14px; }
+    .iaru-double-line { height: 4px; margin-top: 2px; border-top: 1px solid #111; border-bottom: 1px solid #111; }
     .iaru-operator-title { margin-top: 4px; font-size: 16px; font-weight: 400; }
     .iaru-operator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 52px; margin-top: 4px; }
     .iaru-operator-grid table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
     .iaru-operator-grid th, .iaru-operator-grid td { border: 1px solid #111; height: 20px; padding: 3px; text-align: center; font-weight: 400; }
     .iaru-operator-grid th:first-child { width: 39%; }
-    @page { size: A4; margin: 12mm; }
+    @page { size: A4; margin: 10mm; }
   `;
+}
+
+function formatTrafficAddress(value) {
+  const rawValue = String(value || "").trim().toUpperCase();
+  const tacticalCall = String(data.settings.tacticalCall || "").trim().toUpperCase();
+  const netControlNames = new Set(["NET CONTROL", "NCS", tacticalCall].filter(Boolean));
+  if (netControlNames.has(rawValue)) {
+    return [data.settings.callsign, data.settings.tacticalCall]
+      .filter(Boolean)
+      .join(" ")
+      .trim()
+      .toUpperCase();
+  }
+  return rawValue;
 }
 
 function openMessageDetail(messageId) {

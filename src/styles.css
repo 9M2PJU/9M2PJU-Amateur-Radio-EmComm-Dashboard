@@ -762,24 +762,26 @@ dialog menu {
 }
 
 .iaru-title-row {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: start;
-  margin-bottom: 8px;
+  position: relative;
+  min-height: 62px;
+  margin-bottom: 4px;
 }
 
 .iaru-title-row h1 {
   margin: 0;
+  padding-top: 4px;
   color: #111111;
-  font-size: 1.45rem;
+  font-size: 1.55rem;
   font-weight: 500;
   text-align: center;
 }
 
 .iaru-logo {
-  justify-self: center;
-  width: 48px;
-  height: 64px;
+  position: absolute;
+  top: 0;
+  right: 64px;
+  width: 42px;
+  height: 58px;
   object-fit: contain;
 }
 
@@ -792,7 +794,7 @@ dialog menu {
 
 .iaru-header-table th,
 .iaru-header-table td {
-  height: 58px;
+  height: 54px;
   padding: 4px;
   border: 1px solid #111111;
   vertical-align: top;
@@ -827,14 +829,10 @@ dialog menu {
 }
 
 .iaru-header-table th {
+  color: #5f7378;
   text-align: center;
   font-size: 0.7rem;
   line-height: 1.1;
-}
-
-.iaru-header-table th span {
-  font-size: 0.58rem;
-  font-weight: 400;
 }
 
 .iaru-check {
@@ -865,14 +863,14 @@ dialog menu {
 }
 
 .iaru-message-lines div {
-  min-height: 40px;
+  min-height: 34px;
   padding: 8px 0 3px;
   border-bottom: 1px solid #111111;
   font-size: 0.9rem;
 }
 
 .iaru-double-line {
-  height: 5px;
+  height: 4px;
   margin-top: 2px;
   border-top: 1px solid #111111;
   border-bottom: 1px solid #111111;

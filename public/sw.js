@@ -1,8 +1,9 @@
-const cacheName = "emcomm-dashboard-v2";
+const cacheName = "emcomm-dashboard-v3";
 const assets = [
   "./",
   "./index.html",
   "./favicon.svg",
+  "./iaru-logo.png",
   "./manifest.webmanifest"
 ];
 
