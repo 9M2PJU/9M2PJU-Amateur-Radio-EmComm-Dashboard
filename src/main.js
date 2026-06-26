@@ -3,6 +3,7 @@ import "leaflet/dist/leaflet.css";
 import "./styles.css";
 
 const storageKey = "emcomm-dashboard-v1";
+let storageState = "Local Saved";
 
 const seedData = {
   settings: {
@@ -104,10 +105,10 @@ let installPrompt;
 let pendingRelocateStationId = null;
 
 function loadData() {
-  const saved = localStorage.getItem(storageKey);
+  const saved = readLocalData();
   if (!saved) {
     const incident = createIncidentData();
-    localStorage.setItem(storageKey, JSON.stringify(incident));
+    writeLocalData(incident);
     return incident;
   }
   try {
@@ -115,7 +116,7 @@ function loadData() {
   } catch (error) {
     const incident = createIncidentData({ notes: "Previous local data could not be read. Import a backup JSON if available." });
     incident.log.unshift({ time: new Date().toISOString(), text: `Local data recovery started: ${error.message}` });
-    localStorage.setItem(storageKey, JSON.stringify(incident));
+    writeLocalData(incident);
     return incident;
   }
 }
@@ -147,7 +148,7 @@ function migrateData(saved) {
     readiness: saved.readiness || seedData.readiness,
     log: saved.log || []
   };
-  localStorage.setItem(storageKey, JSON.stringify(migrated));
+  writeLocalData(migrated);
   return migrated;
 }
 
@@ -156,8 +157,32 @@ function saveData(action) {
     data.log.unshift({ time: new Date().toISOString(), text: action });
     data.log = data.log.slice(0, 120);
   }
-  localStorage.setItem(storageKey, JSON.stringify(data));
+  writeLocalData(data);
   render();
+}
+
+function readLocalData() {
+  try {
+    storageState = "Local Saved";
+    return window.localStorage.getItem(storageKey);
+  } catch (error) {
+    storageState = "Local Error";
+    console.error("Browser local storage read failed", error);
+    return null;
+  }
+}
+
+function writeLocalData(value) {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(value));
+    storageState = "Local Saved";
+    return true;
+  } catch (error) {
+    storageState = "Local Error";
+    console.error("Browser local storage write failed", error);
+    alert("Local browser storage failed. Export your data now if possible, then check private browsing or browser storage settings.");
+    return false;
+  }
 }
 
 function downloadText(filename, text, type = "text/plain") {
@@ -496,7 +521,7 @@ function render() {
   document.getElementById("stationCount").textContent = data.checkins.length;
   document.getElementById("urgentCount").textContent = data.messages.filter((m) => m.priority === "Emergency").length;
   document.getElementById("openTaskCount").textContent = data.tasks.filter((t) => t.status !== "Done").length;
-  document.getElementById("onlineState").textContent = navigator.onLine ? "Online" : "Offline";
+  document.getElementById("onlineState").textContent = storageState;
   renderCheckins();
   renderFrequencies();
   renderMessages();
