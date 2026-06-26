@@ -714,6 +714,27 @@ dialog menu {
   color: var(--text);
 }
 
+.marker-label {
+  border: 1px solid rgba(238, 246, 244, 0.26);
+  border-radius: 4px;
+  background: rgba(15, 23, 29, 0.92);
+  color: var(--text);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  padding: 3px 6px;
+  pointer-events: none;
+}
+
+.marker-label::before {
+  display: none;
+}
+
+.station-label {
+  color: #83e8bf;
+}
+
 .custom-marker span {
   display: block;
   width: 18px;

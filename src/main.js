@@ -329,6 +329,12 @@ function markerIcon(type, customColor) {
   });
 }
 
+function markerLabel(item) {
+  const name = String(item.name || "").trim();
+  if (item.type !== "station") return name;
+  return name.split(/\s+/)[0] || name;
+}
+
 function initMap() {
   if (!L) {
     document.getElementById("map").classList.add("map-fallback");
@@ -412,6 +418,13 @@ function renderMap() {
     const group = layerGroups[groupName] || layerGroups.incidents;
     const marker = L.marker([item.lat, item.lng], { icon: markerIcon(item.type, item.color) })
       .bindPopup(`<strong>${escapeHtml(item.name)}</strong><br>${escapeHtml(item.status || item.type)}<br>${escapeHtml(item.note || "")}<br><span>${item.lat.toFixed(5)}, ${item.lng.toFixed(5)}</span>`)
+      .bindTooltip(escapeHtml(markerLabel(item)), {
+        permanent: true,
+        direction: "right",
+        offset: [12, 0],
+        opacity: 1,
+        className: `marker-label ${item.type === "station" ? "station-label" : ""}`
+      })
       .addTo(group);
 
     if (item.type === "station") {
