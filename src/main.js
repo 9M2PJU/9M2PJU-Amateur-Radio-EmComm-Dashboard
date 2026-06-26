@@ -584,7 +584,7 @@ function addMapMarkerAt(type, latlng) {
 function render() {
   renderMap();
   renderSettings();
-  document.getElementById("stationCount").textContent = data.checkins.length;
+  document.getElementById("stationCount").textContent = stationMarkerCount();
   document.getElementById("urgentCount").textContent = data.messages.filter((m) => m.priority === "Emergency").length;
   document.getElementById("openTaskCount").textContent = data.tasks.filter((t) => t.status !== "Done").length;
   document.getElementById("onlineState").textContent = storageState;
@@ -595,6 +595,10 @@ function render() {
   renderStations();
   renderReadiness();
   renderLog();
+}
+
+function stationMarkerCount() {
+  return data.markers.filter((item) => item.type === "station").length;
 }
 
 function renderSettings() {
