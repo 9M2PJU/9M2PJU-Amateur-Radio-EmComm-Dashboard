@@ -152,6 +152,10 @@ function initMap() {
       }
     });
   });
+
+  map.on("contextmenu", (event) => {
+    openStationMarkerDialog(event.latlng.lat, event.latlng.lng);
+  });
 }
 
 function renderMap() {
@@ -340,7 +344,8 @@ function fieldsToHtml(fields) {
     if (field.type === "textarea") {
       return `<label>${field.label}<textarea name="${field.name}" ${required}>${escapeHtml(value)}</textarea></label>`;
     }
-    return `<label>${field.label}<input name="${field.name}" type="${field.type || "text"}" value="${escapeAttribute(value)}" ${required}></label>`;
+    const step = field.type === "number" ? `step="${field.step || "any"}"` : "";
+    return `<label>${field.label}<input name="${field.name}" type="${field.type || "text"}" value="${escapeAttribute(value)}" ${step} ${required}></label>`;
   }).join("");
 }
 
@@ -401,6 +406,33 @@ function settingsFields() {
     { label: "Clock", name: "timezone", type: "select", value: settings.timezone, options: ["UTC", "Local"] },
     { label: "Operating notes", name: "notes", type: "textarea", value: settings.notes }
   ];
+}
+
+function stationMarkerFields(lat, lng) {
+  return [
+    { label: "Callsign or station name", name: "name", value: "" },
+    { label: "Status", name: "status", type: "select", value: "available", options: ["available", "assigned", "mobile", "offline", "needs assistance"] },
+    { label: "Latitude", name: "lat", type: "number", value: lat.toFixed(6) },
+    { label: "Longitude", name: "lng", type: "number", value: lng.toFixed(6) },
+    { label: "Notes", name: "note", type: "textarea", value: "Added by right-click on map" }
+  ];
+}
+
+function openStationMarkerDialog(lat, lng) {
+  openEntry("Add Station on Map", stationMarkerFields(lat, lng), (entry) => {
+    const marker = {
+      id: crypto.randomUUID(),
+      type: "station",
+      name: entry.name.trim().toUpperCase(),
+      lat: Number(entry.lat),
+      lng: Number(entry.lng),
+      status: entry.status,
+      note: entry.note.trim()
+    };
+    if (!marker.name || !Number.isFinite(marker.lat) || !Number.isFinite(marker.lng)) return;
+    data.markers.push(marker);
+    saveData(`Station marker added: ${marker.name}`);
+  }, "Add Station");
 }
 
 function nextMessageNumber() {
