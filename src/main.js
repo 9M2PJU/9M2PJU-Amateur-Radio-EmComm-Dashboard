@@ -37,9 +37,9 @@ const seedData = {
     { id: crypto.randomUUID(), name: "Digital", frequency: "144.390 MHz", mode: "APRS", purpose: "Position reports", status: "Standby" }
   ],
   messages: [
-    { id: crypto.randomUUID(), number: "MSG-001", priority: "Emergency", from: "Relief Centre", to: "Net Control", subject: "Medical transport needed", status: "Sent", handling: "Immediate", method: "Voice", text: "Medical transport requested for one patient.", timeFiled: new Date().toISOString() },
-    { id: crypto.randomUUID(), number: "MSG-002", priority: "Priority", from: "Mobile Team", to: "Logistics", subject: "Need drinking water", status: "Acknowledged", handling: "Priority", method: "Voice", text: "Additional drinking water needed at relief centre.", timeFiled: new Date().toISOString() },
-    { id: crypto.randomUUID(), number: "MSG-003", priority: "Routine", from: "Net Control", to: "All stations", subject: "Operational period update", status: "Delivered", handling: "Routine", method: "Net broadcast", text: "Operational period update sent to all stations.", timeFiled: new Date().toISOString() }
+    { id: crypto.randomUUID(), number: "MSG-001", priority: "Emergency", from: "Relief Centre", to: "Net Control", subject: "Medical transport needed", status: "Sent", handling: "Immediate", method: "Voice", frequency: "145.500 MHz", text: "Medical transport requested for one patient.", timeFiled: new Date().toISOString() },
+    { id: crypto.randomUUID(), number: "MSG-002", priority: "Priority", from: "Mobile Team", to: "Logistics", subject: "Need drinking water", status: "Acknowledged", handling: "Priority", method: "Voice", frequency: "145.500 MHz", text: "Additional drinking water needed at relief centre.", timeFiled: new Date().toISOString() },
+    { id: crypto.randomUUID(), number: "MSG-003", priority: "Routine", from: "Net Control", to: "All stations", subject: "Operational period update", status: "Delivered", handling: "Routine", method: "Net broadcast", frequency: "145.500 MHz", text: "Operational period update sent to all stations.", timeFiled: new Date().toISOString() }
   ],
   tasks: [
     { id: crypto.randomUUID(), title: "Confirm repeater backup power", assignee: "9M4DIGI", priority: "Priority", status: "Assigned", location: "Hill site" },
@@ -72,19 +72,24 @@ function loadData() {
 }
 
 function migrateData(saved) {
+  const frequencies = (saved.frequencies || seedData.frequencies).map((item, index) => ({
+    status: index === 0 ? "Active" : "Standby",
+    ...item
+  }));
+  const activeFrequency = frequencies.find((item) => item.status === "Active")?.frequency
+    || saved.settings?.primaryFrequency
+    || seedData.settings.primaryFrequency;
   const migrated = {
     ...seedData,
     ...saved,
     settings: { ...seedData.settings, ...(saved.settings || {}) },
     markers: saved.markers || seedData.markers,
     checkins: saved.checkins || seedData.checkins,
-    frequencies: (saved.frequencies || seedData.frequencies).map((item, index) => ({
-      status: index === 0 ? "Active" : "Standby",
-      ...item
-    })),
+    frequencies,
     messages: (saved.messages || seedData.messages).map((item) => ({
       handling: item.priority || "Routine",
       method: "Voice",
+      frequency: activeFrequency,
       text: item.subject || "",
       timeFiled: new Date().toISOString(),
       ...item
@@ -384,6 +389,7 @@ function renderMessages() {
       <td>${escapeHtml(formatUtcTime(item.timeFiled))}</td>
       <td>${escapeHtml(formatLocalTime(item.timeFiled))}</td>
       <td><span class="badge ${item.priority.toLowerCase()}">${escapeHtml(item.priority)}</span></td>
+      <td>${escapeHtml(item.frequency || activeFrequencyLabel())}</td>
       <td>${escapeHtml(item.from)}</td>
       <td>${escapeHtml(item.to)}</td>
       <td>${escapeHtml(item.subject)}</td>
@@ -524,6 +530,7 @@ function messageFields(item = {}) {
     { label: "Message number", name: "number", value: item.number || nextMessageNumber() },
     { label: "Precedence", name: "priority", type: "select", value: item.priority || "Routine", options: ["Routine", "Priority", "Emergency", "Welfare"] },
     { label: "Handling", name: "handling", type: "select", value: item.handling || "Routine", options: ["Routine", "Priority", "Immediate", "Health and welfare"] },
+    { label: "Frequency", name: "frequency", type: "select", value: item.frequency || activeFrequencyLabel(), options: frequencyOptions() },
     { label: "From", name: "from", type: "station-select", manualName: "fromManual", value: item.from || data.settings.tacticalCall, options: stationOptions },
     { label: "To", name: "to", value: item.to },
     { label: "Subject", name: "subject", value: item.subject },
@@ -531,6 +538,21 @@ function messageFields(item = {}) {
     { label: "Status", name: "status", type: "select", value: item.status || "Drafted", options: ["Drafted", "Sent", "Acknowledged", "Delivered", "Canceled"] },
     { label: "Message text", name: "text", type: "textarea", value: item.text || item.subject || "" }
   ];
+}
+
+function activeFrequencyLabel() {
+  return data.frequencies.find((item) => item.status === "Active")?.frequency
+    || data.settings.primaryFrequency
+    || "Not assigned";
+}
+
+function frequencyOptions() {
+  return [...new Set([
+    activeFrequencyLabel(),
+    data.settings.primaryFrequency,
+    ...data.frequencies.map((item) => item.frequency),
+    "Not assigned"
+  ].map((value) => String(value || "").trim()).filter(Boolean))];
 }
 
 function stationCallsignOptions() {
@@ -602,6 +624,7 @@ function normalizeMessage(entry, existing = {}) {
     from: cleanFrom,
     to: entry.to.trim(),
     subject: entry.subject.trim(),
+    frequency: String(entry.frequency || activeFrequencyLabel()).trim(),
     text: entry.text.trim(),
     timeFiled: existing.timeFiled || new Date().toISOString(),
     operator: data.settings.callsign
