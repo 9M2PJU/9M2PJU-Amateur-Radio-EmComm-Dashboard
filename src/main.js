@@ -1319,6 +1319,14 @@ function activateTab(tabName) {
   panel.classList.add("active");
 }
 
+function setSettingsMenuOpen(open) {
+  const button = document.getElementById("openSettings");
+  const menu = document.getElementById("settingsMenu");
+  if (!button || !menu) return;
+  button.setAttribute("aria-expanded", String(open));
+  menu.hidden = !open;
+}
+
 function bindActions() {
   document.getElementById("addCheckin").addEventListener("click", () => openEntry("Station Check In", stationCheckinFields(), (entry) => {
     const station = normalizeStationCheckin(entry);
@@ -1361,9 +1369,29 @@ function bindActions() {
     setAddMarkerMode(pendingAddMarkerType === "incident" ? null : "incident");
   });
 
-  document.getElementById("openSettings").addEventListener("click", () => {
+  document.getElementById("openSettings").addEventListener("click", (event) => {
+    event.stopPropagation();
+    setSettingsMenuOpen(document.getElementById("settingsMenu")?.hidden);
+  });
+
+  document.getElementById("settingsMenu").addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+
+  document.getElementById("openSettingsTab").addEventListener("click", () => {
+    setSettingsMenuOpen(false);
     activateTab("settings");
     document.getElementById("settings")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  document.getElementById("editSettingsFromMenu").addEventListener("click", () => {
+    setSettingsMenuOpen(false);
+    document.getElementById("editSettings").click();
+  });
+
+  document.addEventListener("click", () => setSettingsMenuOpen(false));
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setSettingsMenuOpen(false);
   });
 
   document.getElementById("newIncident").addEventListener("click", () => {

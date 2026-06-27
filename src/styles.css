@@ -159,6 +159,34 @@ h2 {
   font-weight: 800;
 }
 
+.settings-menu {
+  position: relative;
+}
+
+.settings-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1200;
+  display: grid;
+  min-width: 220px;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #132028;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36);
+}
+
+.settings-menu-panel[hidden] {
+  display: none;
+}
+
+.settings-menu-panel button {
+  width: 100%;
+  text-align: left;
+}
+
 #exportCsv {
   min-width: 58px;
   font-size: 0.72rem;
@@ -675,34 +703,10 @@ th {
   overflow-wrap: anywhere;
 }
 
-.danger-zone {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-top: 14px;
-  padding: 14px;
-  border: 1px solid rgba(239, 106, 97, 0.45);
-  border-radius: 6px;
-  background: rgba(239, 106, 97, 0.08);
-}
-
-.danger-zone strong,
-.danger-zone span {
-  display: block;
-}
-
-.danger-zone span {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 0.84rem;
-}
-
 .danger-button {
   border-color: rgba(239, 106, 97, 0.7);
   background: #3a1d1d;
   color: #fff0ef;
-  flex: 0 0 auto;
 }
 
 .danger-button:hover {
@@ -1066,11 +1070,6 @@ dialog menu {
   .kanban,
   #dialogFields {
     grid-template-columns: 1fr;
-  }
-
-  .danger-zone {
-    align-items: stretch;
-    flex-direction: column;
   }
 
   .danger-button {
