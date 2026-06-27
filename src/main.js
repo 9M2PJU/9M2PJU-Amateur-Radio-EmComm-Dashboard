@@ -89,6 +89,7 @@ function createIaruMessageRecord(item, settings, activeFrequency) {
   const timeFiled = item.timeFiled || new Date().toISOString();
   const text = String(item.text || item.subject || "").trim();
   const from = String(item.from || item.stationOrigin || settings.callsign || "").trim().toUpperCase();
+  const stationOrigin = String(item.stationOrigin || from).trim().toUpperCase();
   const sentAt = item.sentAt || (trafficHasBeenSent(item.status) ? timeFiled : "");
   return {
     handling: item.priority || "Routine",
@@ -97,7 +98,7 @@ function createIaruMessageRecord(item, settings, activeFrequency) {
     frequency: item.frequency || activeFrequency,
     text,
     timeFiled,
-    stationOrigin: String(item.stationOrigin || from).trim().toUpperCase(),
+    stationOrigin,
     placeOrigin: String(item.placeOrigin || settings.location || "").trim().toUpperCase(),
     filingTime: item.filingTime || formatFilingTime(timeFiled),
     filingDate: item.filingDate || formatFilingDate(timeFiled),
@@ -105,6 +106,8 @@ function createIaruMessageRecord(item, settings, activeFrequency) {
     from,
     to: String(item.to || "").trim().toUpperCase(),
     subject: item.subject || messageSummary(text),
+    operatorReceivedFrom: String(item.operatorReceivedFrom || stationOrigin || from).trim().toUpperCase(),
+    operatorSentTo: String(item.operatorSentTo || "").trim().toUpperCase(),
     receivedAt: item.receivedAt || timeFiled,
     sentAt
   };
@@ -347,11 +350,12 @@ function iaruMessageHtml(message) {
   const currentPrecedence = String(message.priority || "Routine");
   const text = String(message.text || message.subject || "").trim();
   const wordCount = message.wordCount || countMessageWords(text);
-  const operatorCallsign = String(data.settings.callsign || message.operator || "").trim().toUpperCase();
+  const operatorReceivedFrom = String(message.operatorReceivedFrom || message.stationOrigin || message.from || "").trim().toUpperCase();
+  const operatorSentTo = String(message.operatorSentTo || "").trim().toUpperCase();
   const receivedDate = formatFilingDate(message.receivedAt || message.timeFiled);
   const receivedTime = formatFilingTime(message.receivedAt || message.timeFiled);
-  const sentDate = message.sentAt ? formatFilingDate(message.sentAt) : "";
-  const sentTime = message.sentAt ? formatFilingTime(message.sentAt) : "";
+  const sentDate = operatorSentTo && message.sentAt ? formatFilingDate(message.sentAt) : "";
+  const sentTime = operatorSentTo && message.sentAt ? formatFilingTime(message.sentAt) : "";
   const sentAddress = formatTrafficAddress(message.to);
   const iaruLogoUrl = assetUrl("iaru-logo.png");
   const messageLines = Array.from({ length: 4 }, (_, index) => {
@@ -406,7 +410,7 @@ function iaruMessageHtml(message) {
             <th>TIME</th>
           </tr>
           <tr>
-            <td>${escapeHtml(operatorCallsign)}</td>
+            <td>${escapeHtml(operatorReceivedFrom)}</td>
             <td>${escapeHtml(receivedDate)}</td>
             <td>${escapeHtml(receivedTime)}</td>
           </tr>
@@ -418,7 +422,7 @@ function iaruMessageHtml(message) {
             <th>TIME</th>
           </tr>
           <tr>
-            <td>${escapeHtml(sentAddress)}</td>
+            <td>${escapeHtml(operatorSentTo)}</td>
             <td>${escapeHtml(sentDate)}</td>
             <td>${escapeHtml(sentTime)}</td>
           </tr>
@@ -517,7 +521,7 @@ function messageTrafficSummary(message) {
         <strong>${escapeHtml(message.frequency || activeFrequencyLabel())}</strong>
       </article>
       <article>
-        <span>Status</span>
+        <span>Delivery Status</span>
         <strong>${escapeHtml(message.status)}</strong>
       </article>
     </div>
@@ -1100,7 +1104,9 @@ function messageFields(item = {}) {
     { label: "Addressee / To", name: "to", value: item.to || netControlIdentity(), help: "Recipient written in block letters. NET CONTROL resolves to the current station identity." },
     { label: "Message text", name: "text", type: "textarea", value: item.text || item.subject || "", help: "Formal message body only. Keep it plain and easy to copy." },
     { label: "Signature / From", name: "from", type: "select", value: selectedFrom, options: stationOptions, help: "Station or person responsible for the message content." },
-    { label: "Status", name: "status", type: "select", value: item.status || "Drafted", options: ["Drafted", "Sent", "Acknowledged", "Delivered", "Canceled"] },
+    { label: "Delivery status", name: "status", type: "select", value: item.status || "Drafted", options: ["Drafted", "Sent", "Acknowledged", "Delivered", "Canceled"], help: "Progress of this traffic record. This is separate from the IARU operator SENT TO box." },
+    { label: "Operator received from", name: "operatorReceivedFrom", value: item.operatorReceivedFrom || selectedOrigin, help: "For the IARU operator box. Usually the station that passed this traffic to you." },
+    { label: "Operator sent to", name: "operatorSentTo", value: item.operatorSentTo || "", help: "For the IARU operator box. Leave blank until this traffic is relayed or delivered to another operator/station." },
   ];
 }
 
@@ -1229,6 +1235,8 @@ function normalizeMessage(entry, existing = {}) {
     frequency: String(entry.frequency || activeFrequencyLabel()).trim(),
     text: text.toUpperCase(),
     timeFiled: filedAt,
+    operatorReceivedFrom: String(entry.operatorReceivedFrom || entry.stationOrigin || cleanFrom).trim().toUpperCase(),
+    operatorSentTo: String(entry.operatorSentTo || "").trim().toUpperCase(),
     receivedAt: existing.receivedAt || filedAt,
     sentAt,
     status,
