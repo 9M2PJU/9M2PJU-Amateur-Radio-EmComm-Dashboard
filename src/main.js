@@ -214,6 +214,19 @@ function writeLocalData(value) {
   }
 }
 
+function removeLocalData() {
+  try {
+    window.localStorage.removeItem(storageKey);
+    storageState = "Local Saved";
+    return true;
+  } catch (error) {
+    storageState = "Local Error";
+    console.error("Browser local storage delete failed", error);
+    alert("Local browser storage delete failed. Check private browsing or browser storage settings.");
+    return false;
+  }
+}
+
 function downloadText(filename, text, type = "text/plain") {
   const blob = new Blob([text], { type });
   const url = URL.createObjectURL(blob);
@@ -1296,7 +1309,7 @@ function bindActions() {
   document.getElementById("openSettings").addEventListener("click", () => document.getElementById("editSettings").click());
 
   document.getElementById("newIncident").addEventListener("click", () => {
-    if (!confirm("Start a new incident workspace on this device? Export the current incident first if you need a record.")) return;
+    if (!confirm("Start a new incident workspace? All current incident data stored in this browser will be deleted and replaced. Export the current incident first if you need a record.")) return;
     data = createIncidentData({ ...data.settings, nextMessageNumber: 1 });
     saveData("New incident workspace created.");
   });
@@ -1318,6 +1331,16 @@ function bindActions() {
     if (control) control.callsign = data.settings.callsign;
     saveData(`Settings updated for ${data.settings.callsign}`);
   }));
+
+  document.getElementById("deleteAllData").addEventListener("click", () => {
+    if (!confirm("Delete all dashboard data stored in this browser? This cannot be undone.")) return;
+    if (!confirm("Final warning: this will remove messages, markers, stations, tasks, readiness, frequencies, settings, and log data from this browser.")) return;
+    if (!removeLocalData()) return;
+    data = createIncidentData({ ...seedData.settings, nextMessageNumber: 1 });
+    writeLocalData(data);
+    render();
+    alert("All dashboard data in this browser has been deleted.");
+  });
 
   document.getElementById("addTask").addEventListener("click", () => openEntry("Add Task", taskFields(), (entry) => {
     const task = normalizeTask(entry);
