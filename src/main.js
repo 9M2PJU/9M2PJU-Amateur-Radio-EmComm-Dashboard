@@ -1264,6 +1264,15 @@ function normalizeReadiness(entry) {
   };
 }
 
+function activateTab(tabName) {
+  const tab = document.querySelector(`.tab[data-tab="${tabName}"]`);
+  const panel = document.getElementById(tabName);
+  if (!tab || !panel) return;
+  document.querySelectorAll(".tab, .tab-panel").forEach((item) => item.classList.remove("active"));
+  tab.classList.add("active");
+  panel.classList.add("active");
+}
+
 function bindActions() {
   document.getElementById("addCheckin").addEventListener("click", () => openEntry("Station Check In", stationCheckinFields(), (entry) => {
     const station = normalizeStationCheckin(entry);
@@ -1306,7 +1315,10 @@ function bindActions() {
     setAddMarkerMode(pendingAddMarkerType === "incident" ? null : "incident");
   });
 
-  document.getElementById("openSettings").addEventListener("click", () => document.getElementById("editSettings").click());
+  document.getElementById("openSettings").addEventListener("click", () => {
+    activateTab("settings");
+    document.getElementById("settings")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 
   document.getElementById("newIncident").addEventListener("click", () => {
     if (!confirm("Start a new incident workspace? All current incident data stored in this browser will be deleted and replaced. Export the current incident first if you need a record.")) return;
@@ -1439,9 +1451,7 @@ function bindActions() {
 
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.addEventListener("click", () => {
-      document.querySelectorAll(".tab, .tab-panel").forEach((item) => item.classList.remove("active"));
-      tab.classList.add("active");
-      document.getElementById(tab.dataset.tab).classList.add("active");
+      activateTab(tab.dataset.tab);
     });
   });
 
