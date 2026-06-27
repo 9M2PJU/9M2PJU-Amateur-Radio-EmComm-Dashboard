@@ -101,7 +101,7 @@ function createIaruMessageRecord(item, settings, activeFrequency) {
     stationOrigin,
     placeOrigin: String(item.placeOrigin || settings.location || "").trim().toUpperCase(),
     filingTime: item.filingTime || formatFilingTime(timeFiled),
-    filingDate: item.filingDate || formatFilingDate(timeFiled),
+    filingDate: normalizeDisplayDate(item.filingDate) || formatFilingDate(timeFiled),
     wordCount: Math.max(0, Number(item.wordCount) || countMessageWords(text)),
     from,
     to: String(item.to || "").trim().toUpperCase(),
@@ -265,7 +265,7 @@ function exportCsvPackage() {
       word_count_check: item.wordCount,
       place_of_origin: item.placeOrigin,
       filing_time: item.filingTime,
-      filing_date: item.filingDate,
+      filing_date: normalizeDisplayDate(item.filingDate) || formatFilingDate(item.timeFiled),
       frequency: item.frequency,
       to: item.to,
       from: item.from,
@@ -403,7 +403,7 @@ function iaruMessageHtml(message) {
           <td>${escapeHtml(wordCount)}</td>
           <td>${escapeHtml(message.placeOrigin || data.settings.location)}</td>
           <td>${escapeHtml(message.filingTime || formatFilingTime(message.timeFiled))}</td>
-          <td>${escapeHtml(message.filingDate || formatFilingDate(message.timeFiled))}</td>
+          <td>${escapeHtml(normalizeDisplayDate(message.filingDate) || formatFilingDate(message.timeFiled))}</td>
         </tr>
       </table>
       <div class="iaru-line-field">
@@ -955,7 +955,7 @@ function renderMessages() {
   document.getElementById("messageTable").innerHTML = data.messages.length ? data.messages.map((item) => `
     <tr class="message-row ${findMarkerForMessage(item) ? "has-map-target" : ""}" data-message-id="${escapeHtml(item.id)}">
       <td>${escapeHtml(item.number)}</td>
-      <td>${escapeHtml(item.filingDate || formatFilingDate(item.timeFiled))}</td>
+      <td>${escapeHtml(normalizeDisplayDate(item.filingDate) || formatFilingDate(item.timeFiled))}</td>
       <td>${escapeHtml(item.filingTime || formatFilingTime(item.timeFiled))}</td>
       <td><span class="badge ${item.priority.toLowerCase()}">${escapeHtml(item.priority)}</span></td>
       <td>${escapeHtml(item.stationOrigin || item.from)}</td>
@@ -1035,7 +1035,7 @@ function renderReadiness() {
 function renderLog() {
   document.getElementById("eventLog").innerHTML = data.log.length ? data.log.map((item) => `
     <li>
-      <strong>${new Date(item.time).toLocaleString()}</strong>
+      <strong>${formatLocalTime(item.time)}</strong>
       <span class="meta">${escapeHtml(item.text)}</span>
     </li>
   `).join("") : `<li><strong>No log entries</strong><span class="meta">Operational events appear here as work is recorded.</span></li>`;
@@ -1053,7 +1053,9 @@ function fieldsToHtml(fields) {
       return `<label>${field.label}${help}<textarea name="${field.name}" ${required}>${escapeHtml(value)}</textarea></label>`;
     }
     const step = field.type === "number" ? `step="${field.step || "any"}"` : "";
-    return `<label>${field.label}${help}<input name="${field.name}" type="${field.type || "text"}" value="${escapeAttribute(value)}" ${step} ${required}></label>`;
+    const pattern = field.pattern ? `pattern="${escapeAttribute(field.pattern)}"` : "";
+    const placeholder = field.placeholder ? `placeholder="${escapeAttribute(field.placeholder)}"` : "";
+    return `<label>${field.label}${help}<input name="${field.name}" type="${field.type || "text"}" value="${escapeAttribute(value)}" ${step} ${pattern} ${placeholder} ${required}></label>`;
   }).join("");
 }
 
@@ -1137,7 +1139,7 @@ function messageFields(item = {}) {
     { label: "Word count check", name: "wordCount", type: "number", value: item.wordCount || countMessageWords(item.text || item.subject || ""), help: "Auto-counted from message text; used to verify copied traffic." },
     { label: "Place of origin", name: "placeOrigin", value: item.placeOrigin || data.settings.location, help: "Location where the message was filed." },
     { label: "Filing time", name: "filingTime", type: "time", value: item.filingTime || formatFilingTime(filingSource), help: "Local time the message was filed." },
-    { label: "Filing date", name: "filingDate", type: "date", value: item.filingDate || formatFilingDate(filingSource), help: "Local date the message was filed." },
+    { label: "Filing date", name: "filingDate", value: normalizeDisplayDate(item.filingDate) || formatFilingDate(filingSource), pattern: "\\d{2}/\\d{2}/\\d{4}", placeholder: "DD/MM/YYYY", help: "Local date the message was filed. Use DD/MM/YYYY." },
     { label: "Traffic frequency", name: "frequency", type: "select", value: item.frequency || activeFrequencyLabel(), options: frequencyOptions(), help: "Frequency used to pass or log this message." },
     { label: "Addressee / To", name: "to", value: item.to || netControlIdentity(), help: "Recipient written in block letters. NET CONTROL resolves to the current station identity." },
     { label: "Message text", name: "text", type: "textarea", value: item.text || item.subject || "", help: "Formal message body only. Keep it plain and easy to copy." },
@@ -1254,7 +1256,7 @@ function normalizeMessage(entry, existing = {}) {
   const cleanFrom = String(entry.from || stationCallsignOptions()[0] || "").trim().toUpperCase();
   const text = String(entry.text || "").trim();
   const filedAt = existing.timeFiled || new Date().toISOString();
-  const filingDate = entry.filingDate || formatFilingDate(filedAt);
+  const filingDate = normalizeDisplayDate(entry.filingDate) || formatFilingDate(filedAt);
   const filingTime = entry.filingTime || formatFilingTime(filedAt);
   const status = entry.status || existing.status || "Drafted";
   const sentAt = trafficHasBeenSent(status) ? existing.sentAt || new Date().toISOString() : "";
@@ -1699,33 +1701,47 @@ function tickClock() {
 function formatUtcTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--";
-  return `${date.toISOString().slice(0, 10)} ${date.toISOString().slice(11, 16)}Z`;
+  return `${formatDateParts(date, true)} ${date.toISOString().slice(11, 16)}Z`;
 }
 
 function formatLocalTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--";
-  return date.toLocaleString([], {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+  return `${formatDateParts(date)} ${formatFilingTime(date)}`;
 }
 
 function formatFilingDate(value = new Date()) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
+  return formatDateParts(date);
 }
 
 function formatFilingTime(value = new Date()) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatDateParts(date, utc = false) {
+  const day = String(utc ? date.getUTCDate() : date.getDate()).padStart(2, "0");
+  const month = String((utc ? date.getUTCMonth() : date.getMonth()) + 1).padStart(2, "0");
+  const year = utc ? date.getUTCFullYear() : date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function normalizeDisplayDate(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const slash = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) {
+    const day = slash[1].padStart(2, "0");
+    const month = slash[2].padStart(2, "0");
+    return `${day}/${month}/${slash[3]}`;
+  }
+  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? "" : formatFilingDate(date);
 }
 
 function countMessageWords(value) {
