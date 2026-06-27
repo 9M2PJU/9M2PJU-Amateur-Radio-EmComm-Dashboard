@@ -302,6 +302,7 @@ function exportCsvPackage() {
 }
 
 function printOperationalLog() {
+  const appName = appDisplayName();
   const rows = data.log.map((item) => `
     <tr>
       <td>${escapeHtml(formatUtcTime(item.time))}</td>
@@ -317,15 +318,30 @@ function printOperationalLog() {
       <head>
         <title>${escapeHtml(data.settings.incidentName)} Operational Log</title>
         <style>
-          body { font-family: Arial, sans-serif; color: #111; }
+          body { margin: 0; padding: 14mm 0 12mm; font-family: Arial, sans-serif; color: #111; }
+          .print-page-header,
+          .print-page-footer {
+            position: fixed;
+            left: 0;
+            right: 0;
+            color: #555;
+            font-size: 10px;
+            letter-spacing: 0;
+            text-align: center;
+          }
+          .print-page-header { top: 0; padding-bottom: 4mm; border-bottom: 1px solid #ccc; }
+          .print-page-footer { bottom: 0; padding-top: 4mm; border-top: 1px solid #ccc; }
           h1 { font-size: 20px; margin-bottom: 4px; }
           .meta { margin-bottom: 16px; font-size: 12px; }
           table { width: 100%; border-collapse: collapse; font-size: 12px; }
           th, td { border: 1px solid #555; padding: 6px; text-align: left; vertical-align: top; }
           th { background: #eee; }
+          @page { size: A4; margin: 10mm; }
         </style>
       </head>
       <body>
+        <div class="print-page-header">${escapeHtml(appName)}</div>
+        <div class="print-page-footer">${escapeHtml(appName)}</div>
         <h1>${escapeHtml(data.settings.incidentName)} Operational Log</h1>
         <div class="meta">
           Net: ${escapeHtml(data.settings.netName)} |
@@ -434,7 +450,19 @@ function iaruMessageHtml(message) {
 
 function iaruPrintStyles() {
   return `
-    body { margin: 0; padding: 8mm 9mm; color: #111; background: #fff; font-family: Arial, Helvetica, sans-serif; }
+    body { margin: 0; padding: 12mm 9mm 11mm; color: #111; background: #fff; font-family: Arial, Helvetica, sans-serif; }
+    .print-page-header,
+    .print-page-footer {
+      position: fixed;
+      left: 9mm;
+      right: 9mm;
+      color: #555;
+      font-size: 10px;
+      letter-spacing: 0;
+      text-align: center;
+    }
+    .print-page-header { top: 4mm; padding-bottom: 2mm; border-bottom: 1px solid #ccc; }
+    .print-page-footer { bottom: 4mm; padding-top: 2mm; border-top: 1px solid #ccc; }
     .iaru-form { max-width: 190mm; margin: 0 auto; }
     .iaru-title-row { position: relative; min-height: 62px; margin-bottom: 4px; }
     .iaru-title-row h1 { margin: 0; padding-top: 4px; font-size: 25px; font-weight: 500; letter-spacing: 0; text-align: center; }
@@ -473,6 +501,11 @@ function formatTrafficAddress(value) {
     return netControlIdentity();
   }
   return rawValue;
+}
+
+function appDisplayName() {
+  const callsign = String(data.settings.callsign || seedData.settings.callsign || "9M2PJU").trim().toUpperCase();
+  return `${callsign} EmComm Dashboard`;
 }
 
 function netControlIdentity() {
@@ -531,6 +564,7 @@ function messageTrafficSummary(message) {
 function printIaruMessage(messageId) {
   const message = data.messages.find((item) => item.id === messageId);
   if (!message) return;
+  const appName = appDisplayName();
   const printWindow = window.open("", `iaru-message-${message.number}`);
   if (!printWindow) return;
   printWindow.document.write(`
@@ -540,7 +574,11 @@ function printIaruMessage(messageId) {
         <title>${escapeHtml(message.number)} IARU Message</title>
         <style>${iaruPrintStyles()}</style>
       </head>
-      <body>${iaruMessageHtml(message)}</body>
+      <body>
+        <div class="print-page-header">${escapeHtml(appName)}</div>
+        <div class="print-page-footer">${escapeHtml(appName)}</div>
+        ${iaruMessageHtml(message)}
+      </body>
     </html>
   `);
   printWindow.document.close();
@@ -840,7 +878,7 @@ function stationMarkerCount() {
 
 function renderSettings() {
   const settings = data.settings;
-  document.getElementById("appTitle").textContent = `${settings.callsign} EmComm Dashboard`;
+  document.getElementById("appTitle").textContent = appDisplayName();
   document.getElementById("netName").textContent = settings.netName;
   document.getElementById("netControl").textContent = settings.callsign;
   document.getElementById("settingsGrid").innerHTML = [
