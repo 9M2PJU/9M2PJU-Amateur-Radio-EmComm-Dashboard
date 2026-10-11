@@ -98,3 +98,9 @@ This structure keeps the app simple and portable. The same data model can be ren
 ## Notes
 
 The dashboard uses Leaflet and OpenStreetMap tiles. The app shell and entered data work offline after first load, while new map tiles require network access unless already cached by the browser.
+
+## Support
+
+If you find this project useful, please consider supporting it:
+
+[![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=9m2pju%40hamradio.my&currency_code=MYR&item_name=9M2PJU-Amateur-Radio-EmComm-Dashboard)
